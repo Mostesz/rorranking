@@ -1,4 +1,4 @@
-getCharacteristicPoints <- function(perf, nums.of.characteristic.points, discretization.algorithm.type = 'EQUAL_FREQ_INTERVAL') {
+getCharacteristicPoints <- function(perf, nums.of.characteristic.points, discretization.algorithm.type = 'EQUAL_WIDTH_INTERVAL') {
   if (!discretization.algorithm.type %in% getDiscretizationAlgorithmsTypes()) {
     stop(paste("Argument 'discretizationAlgorithmType' must be a vector of either ",
                paste(getDiscretizationAlgorithmsTypes(), collapse=", "), collapse=""))

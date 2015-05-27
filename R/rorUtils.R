@@ -307,10 +307,6 @@ buildMonotonousConstraints <- function(perf, strict.vf=FALSE, nums.of.characteri
   levels.list <- getLevels(perf);
   characteristic.points = getCharacteristicPoints(perf, nums.of.characteristic.points);
   
-  print("START characteristic.points");
-  print(characteristic.points)
-  print("END characteristic.points");
-  
   num.of.values = getNrVars(levels.list)
   num.of.characteristic.points = getNrVars(characteristic.points) -1;
   offsets <- getOffsets(levels.list);
