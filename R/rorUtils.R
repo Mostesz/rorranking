@@ -204,37 +204,7 @@ getIntervalData <- function(characteristic.points, criterion.index, value) {
   }
   interval = list(index=i, value = c(bottom, top));
   return(interval)
-} 
-
-getCharacteristicPoints <- function(perf, nums.of.characteristic.points) {
-  # Function return list of lists of characteristic points for each criterion
-  # 
-  # perf: the performance matrix
-  # nums.of.characteristic.points: list of nums of characteristic points for each criterion 
-  levels.list <- getLevels(perf);
-  list.of.characteristic.points = list()
-  nrAlts <- nrow(perf)
-  nrCrit <- ncol(perf)
-  for (i in c(1:nrCrit)){  #dla każdego kryterium
-    list.of.characteristic.points[[i]] = vector(mode="numeric", length=0)
-    num.of.characteristic.points = nums.of.characteristic.points[i]
-    if (!is.numeric(num.of.characteristic.points)) {
-      num.of.characteristic.points = 0
-    }
-    if (num.of.characteristic.points > 1) {
-      for (j in c(1:num.of.characteristic.points)) {
-        last.level = getLastElement(levels.list[[i]])      
-        range.of.performance = last.level - levels.list[[i]][1]
-        characteristic.point = levels.list[[i]][1] + (range.of.performance)*(j-1)/(num.of.characteristic.points-1) 
-        list.of.characteristic.points[[i]] = c(list.of.characteristic.points[[i]], characteristic.point)
-      }  
-    } else {
-      list.of.characteristic.points[[i]] = list()
-    }
-  }
-  return(list.of.characteristic.points);
 }
-
 
 buildMonotonousConstraintsForValuesOrCharacteristicPoints <- function(perf,
                                                               characteristic.points, offsets,  offsets.for.characteristic.points, num.of.variables, strict.vf = FALSE, criteria=NULL) {
@@ -336,6 +306,11 @@ buildMonotonousConstraints <- function(perf, strict.vf=FALSE, nums.of.characteri
   stopifnot(is.logical(strict.vf));
   levels.list <- getLevels(perf);
   characteristic.points = getCharacteristicPoints(perf, nums.of.characteristic.points);
+  
+  print("START characteristic.points");
+  print(characteristic.points)
+  print("END characteristic.points");
+  
   num.of.values = getNrVars(levels.list)
   num.of.characteristic.points = getNrVars(characteristic.points) -1;
   offsets <- getOffsets(levels.list);
