@@ -21,7 +21,7 @@ getCharacteristicPoints <- function(perf, nums.of.characteristic.points, discret
 }
 
 getCharacteristicPointsKernelDensityEstimation <- function(perf, nums.of.characteristic.points) {
-  intervals.number = nums.of.characteristic.points - 1
+  intervals.numbers = nums.of.characteristic.points - 1
   list.of.characteristic.points <- list()
   
   nr.crit <- ncol(perf)
@@ -36,7 +36,7 @@ getCharacteristicPointsKernelDensityEstimation <- function(perf, nums.of.charact
     landmarks <- c(unique.instances[1], tail(unique.instances, n=1))
     cut.point.idx <- 0
     
-    while (cut.point.idx < intervals.number[i] - 1) {
+    while (cut.point.idx < intervals.numbers[i] - 1) {
       pl <- matrix(0, nrow=length(instances), ncol=length(instances))
       pr <- matrix(0, nrow=length(instances), ncol=length(instances))
       Score <- c()
@@ -104,18 +104,39 @@ kernelFunction <- function(x1,x2,h) {
   return(( 1 / ( (sqrt(2*pi)) * (h/6)) ) * exp( (-(x1-x2)^2) / (2*(h/6)^2) ));
 }
 
-getCharacteristicPoints <- function(perf, nums.of.characteristic.points, method.name) {
-  criteria.perfs <- list()
-  for (i in 1:ncol(perf)) {
-    criteria.perfs[[i]] <- sort(perf[,i])
-  }
+getCharacteristicPointsKMeans <- function(perf, nums.of.characteristic.points) {
+  intervals.numbers = nums.of.characteristic.points - 1
   nr.crit <- ncol(perf)
-  
   list.of.characteristic.points <- list()  
   for (i in 1:nr.crit) {
-    list.of.characteristic.points[[i]] <- discretize(criteria.perfs[[i]],
+    crit.values <- sort(perf[,i])
+    clusters.assignments <- Kmeans(crit.values, intervals.numbers[i], iter.max=100, method = "euclidean")$cluster
+    
+    charac.points = c()
+    last.assignment <- NULL
+    for (j in 1:length(clusters.assignments)) {
+      if (is.null(last.assignment)) {
+        charac.points = c(charac.points, crit.values[j])
+      } else if (last.assignment != clusters.assignments[j]) {
+        charac.points = c(charac.points, (crit.values[j] + crit.values[j - 1]) / 2)
+      }
+      last.assignment <- clusters.assignments[j]
+    }
+    charac.points = c(charac.points, crit.values[length(clusters.assignments)])
+    
+    list.of.characteristic.points[[i]] = charac.points
+  }
+  return(list.of.characteristic.points)
+}
+
+getCharacteristicPoints <- function(perf, nums.of.characteristic.points, method.name) {
+  intervals.numbers = nums.of.characteristic.points - 1
+  nr.crit <- ncol(perf)
+  list.of.characteristic.points <- list()  
+  for (i in 1:nr.crit) {
+    list.of.characteristic.points[[i]] <- discretize(perf[,i],
                                                      method=method.name,
-                                                     categories=nums.of.characteristic.points[i] - 1,
+                                                     categories=intervals.numbers[i],
                                                      onlycuts=TRUE)
   }
   
