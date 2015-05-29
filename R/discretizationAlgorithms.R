@@ -1,4 +1,8 @@
-getCharacteristicPoints <- function(perf, nums.of.characteristic.points, discretization.algorithm.type = 'EQUAL_WIDTH_INTERVAL') {
+getCharacteristicPoints <- function(perf, nums.of.characteristic.points,
+                                    discretization.algorithm.type = 'EQUAL_WIDTH_INTERVAL',
+                                    strong.prefs = NULL,
+                                    weak.prefs = NULL,
+                                    indif.prefs = NULL) {
   if (!discretization.algorithm.type %in% getDiscretizationAlgorithmsTypes()) {
     stop(paste("Argument 'discretizationAlgorithmType' must be a vector of either ",
                paste(getDiscretizationAlgorithmsTypes(), collapse=", "), collapse=""))
@@ -16,8 +20,22 @@ getCharacteristicPoints <- function(perf, nums.of.characteristic.points, discret
          },
          KERNEL_DENSITY_ESTIMATION = {
            getCharacteristicPointsKernelDensityEstimation(perf, nums.of.characteristic.points)
+         },
+         GHADERI_DISCRETIZATION = {
+           getCharacteristicPointsGhaderi(perf, nums.of.characteristic.points, 
+                                          strong.prefs, weak.prefs, indif.prefs)
          }
   )
+}
+
+getDiscretizationAlgorithmsTypes <- function() {
+  return(c(
+    'EQUAL_WIDTH_INTERVAL', # równa odległośc punktów charakterystycznych
+    'EQUAL_FREQ_INTERVAL', # równa liczba ocen wariantów w ramach odcinków
+    'K_MEANS', # k-means uruchomiony na ocenach z euklidesową metryką odległości
+    'KERNEL_DENSITY_ESTIMATION', # dyskretyzacja oparta na tzw. funkcji kernelizującej
+    'GHADERI_DISCRETIZATION' # metoda Ghaderi
+  ));
 }
 
 getCharacteristicPointsKernelDensityEstimation <- function(perf, nums.of.characteristic.points) {
@@ -129,6 +147,58 @@ getCharacteristicPointsKMeans <- function(perf, nums.of.characteristic.points) {
   return(list.of.characteristic.points)
 }
 
+getCharacteristicPointsGhaderi <- function(perf, nums.of.characteristic.points,
+                                           strong.prefs, weak.prefs, indif.prefs) {
+  intervals.numbers = nums.of.characteristic.points - 1
+  preferences = rbind(strong.prefs, weak.prefs, indif.prefs)
+  
+  nr.crit <- ncol(perf)
+  nr.alts <- nrow(perf)
+  levels.list <- getLevels(perf);
+  list.of.characteristic.points <- list()  
+  for (i in 1:nr.crit) {
+    att.values = sort(perf[,i])
+    levels <- levels.list[[i]]
+    candidates <- vector(mode='numeric', length=length(levels)-1)
+    for (j in 1:(length(levels)-1)) {
+      candidates[j] <- (levels[j] + levels[j+1])/2
+    }
+    
+    candidates.obj <- vector(mode='numeric', length=length(candidates))
+    if (length(preferences) > 0) {
+      for (preference.idx in 1:nrow(preferences)) {
+        left.perf <- perf[preferences[preference.idx, 1], i]
+        right.perf <- perf[preferences[preference.idx, 2], i]
+        for (cand.idx in 1:length(candidates)) {
+          if (candidates[cand.idx] >= left.perf && candidates[cand.idx] <= right.perf) {
+            candidates.obj[cand.idx] <- candidates.obj[cand.idx] + 1
+          }
+        }
+      }
+    }
+    candidates.number.constraint <- rep.int(1, length(candidates))
+    
+    obj <- candidates.obj
+    mat <- matrix(candidates.number.constraint, nrow = 1)
+    dir <- c('==')
+    rhs <- c(intervals.numbers[i] - 1)
+    types <- c('B')
+    max <- TRUE
+    lp.result <- Rglpk_solve_LP(obj, mat, dir, rhs, types = types, max = max)
+    
+    list.of.characteristic.points[[i]] <- c(att.values[1])
+    if(lp.result$status == 0) {
+      for(sol.idx in 1:length(lp.result$solution)) {
+        if (lp.result$solution[sol.idx] > 0) {
+          list.of.characteristic.points[[i]] <- c(list.of.characteristic.points[[i]], candidates[sol.idx])
+        }
+      }
+    }
+    list.of.characteristic.points[[i]] <- c(list.of.characteristic.points[[i]], att.values[nr.alts])
+  }
+  return(list.of.characteristic.points)
+}
+
 getCharacteristicPoints <- function(perf, nums.of.characteristic.points, method.name) {
   intervals.numbers = nums.of.characteristic.points - 1
   nr.crit <- ncol(perf)
@@ -169,14 +239,4 @@ getCharacteristicPointsEqualWidthInterval <- function (perf, nums.of.characteris
     }
   }
   return(list.of.characteristic.points);
-}
-
-getDiscretizationAlgorithmsTypes <- function() {
-  return(c(
-      'EQUAL_WIDTH_INTERVAL', # równa odległośc punktów charakterystycznych
-      'EQUAL_FREQ_INTERVAL', # równa liczba ocen wariantów w ramach odcinków
-      'K_MEANS', # k-means uruchomiony na ocenach z euklidesową metryką odległości
-      'KERNEL_DENSITY_ESTIMATION', # dyskretyzacja oparta na tzw. funkcji kernelizującej
-      'GHADERI_DISCRETIZATION' # metoda Ghaderi
-    ));
 }
