@@ -3,16 +3,16 @@ generatePerformances <- function(crits.nr, alts.nr, min.value = 0, max.value = 1
     stop('Criteria number must be greater or equal 2')
   }
   
-  perfs = matrix(runif(crits.nr * alts.nr, min.value, max.value),
+  perfs <- matrix(runif(crits.nr * alts.nr, min.value, max.value),
                   ncol=crits.nr, nrow=alts.nr)
   while(TRUE) {
-    has.domination = FALSE
+    has.domination <- FALSE
     for(i in 1:(alts.nr-1)) {
       for(j in (i+1):alts.nr) {
         while(isDominated(perfs, i, j) || isDominated(perfs, j, i)) {
-          has.domination = TRUE
-          perfs[i,] = runif(crits.nr, min.value, max.value)
-          perfs[j,] = runif(crits.nr, min.value, max.value)
+          has.domination <- TRUE
+          perfs[i,] <- runif(crits.nr, min.value, max.value)
+          perfs[j,] <- runif(crits.nr, min.value, max.value)
         }
       }
     }
@@ -22,6 +22,16 @@ generatePerformances <- function(crits.nr, alts.nr, min.value = 0, max.value = 1
   }
   
   return(perfs)
+}
+
+generatePreferences <- function(perfs, preferences.nr) {
+  rank <- generateRankingPreferences(perfs)
+  return(rank[sample(nrow(rank), size=preferences.nr, replace=FALSE),])
+}
+
+generateRankingPreferences <- function(perfs) {
+  result <- t(combn(sample(nrow(perfs)), 2))
+  return(result)
 }
 
 isDominated <- function(perfs, dominant.idx, dominated.idx) {
