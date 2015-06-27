@@ -301,11 +301,16 @@ buildConstraintsForValuesEvaluation <- function(characteristic.points,
   return(list())
 }
 
-buildMonotonousConstraints <- function(perf, strict.vf=FALSE, nums.of.characteristic.points=c(), criteria=NULL) {
+buildMonotonousConstraints <- function(perf, strict.vf=FALSE, strong.prefs = NULL, weak.prefs = NULL, indif.prefs = NULL,
+                                       nums.of.characteristic.points=c(), discretization.method=NULL, criteria=NULL) {
   
   stopifnot(is.logical(strict.vf));
   levels.list <- getLevels(perf);
-  characteristic.points = getCharacteristicPoints(perf, nums.of.characteristic.points);
+  characteristic.points = getCharacteristicPoints(perf, nums.of.characteristic.points,
+                                                  discretization.method = discretization.method,
+                                                  strong.prefs = strong.prefs,
+                                                  weak.prefs = weak.prefs,
+                                                  indif.prefs = indif.prefs);
   
   num.of.values = getNrVars(levels.list)
   num.of.characteristic.points = getNrVars(characteristic.points) -1;
@@ -406,7 +411,8 @@ getNormalizedMatrix <- function(matrix, width, right=TRUE) {
   return(matrix);
 }
 
-buildBaseConstraints <- function( perf, num.of.variables, strict.vf = FALSE,  nums.of.characteristic.points = NULL, criteria=NULL) {
+buildBaseConstraints <- function(perf, num.of.variables, strict.vf = FALSE, strong.prefs = NULL, weak.prefs = NULL, indif.prefs = NULL,
+                                 nums.of.characteristic.points = NULL, discretization.method=NULL, criteria=NULL) {
   
   # perf - performances matrix
   # num.of.variables - number of variables used in problem
@@ -415,7 +421,7 @@ buildBaseConstraints <- function( perf, num.of.variables, strict.vf = FALSE,  nu
   #    be piecewise linear
   # nums.of.characteristicPoints - list of values - each value means num of characteristic points on criterium
   c = list(); #list of constraints
-  c[[1]] <- buildMonotonousConstraints(perf, strict.vf, nums.of.characteristic.points, criteria)  
+  c[[1]] <- buildMonotonousConstraints(perf, strict.vf, strong.prefs, weak.prefs, indif.prefs, nums.of.characteristic.points, discretization.method, criteria)  
   c[[2]] <- buildFirstLevelZeroConstraints(perf, criteria)
   c[[3]] <- buildBestLevelsAddToUnityConstraint(perf, criteria)
   c[[4]] <- buildAllVariablesLessThan1Constraint(perf)
@@ -728,7 +734,8 @@ buildBaseLPModel <- function(perf,
                              strong.prefs = NULL, weak.prefs = NULL, indif.prefs = NULL,
                              strong.intensities.of.prefs = NULL, weak.intensities.of.prefs = NULL, indif.intensities.of.prefs = NULL, 
                              rank.related.requirements = NULL,
-                             nums.of.characteristic.points=NULL, criteria=NULL, criteria.by.nodes=NULL) {
+                             nums.of.characteristic.points=NULL, discretization.method=NULL,
+                             criteria=NULL, criteria.by.nodes=NULL) {
   
   
   if (is.null(nums.of.characteristic.points)) {
@@ -741,7 +748,8 @@ buildBaseLPModel <- function(perf,
   
   num.of.variables = getNumberOfVariables(perf, nums.of.characteristic.points)
 
-  all.constraints <- buildBaseConstraints(perf, num.of.variables, strict.vf, nums.of.characteristic.points, criteria=criteria)
+  all.constraints <- buildBaseConstraints(perf, num.of.variables, strict.vf, strong.prefs, weak.prefs, indif.prefs,
+                                          nums.of.characteristic.points, discretization.method, criteria=criteria)
   
   pairwise.comparison.constraints <- buildPairwiseComparisonConstraints(perf,
                                                                         strong.prefs, weak.prefs, indif.prefs,
@@ -820,7 +828,12 @@ checkConstraintsConsistency <- function(model, number.of.real.variables, eps.pos
   #    model$dir: list of operators
   #    model$rhs: matrix - right side of constraints
   ret <- solveModel( model=model, number.of.real.variables=number.of.real.variables, eps.position)
-  return(ret$status$code == 0 && ret$objval >= MINEPS)
+  
+  result <- list(status=(ret$status$code == 0 && ret$objval >= MINEPS))
+  if (status) {
+    result$eps <- ret$solution[eps.position]
+  }
+  return(result)
 }
 
 

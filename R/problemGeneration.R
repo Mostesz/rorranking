@@ -6,11 +6,11 @@ generatePerformances <- function(crits.nr, alts.nr, min.value = 0, max.value = 1
   perfs <- matrix(runif(crits.nr * alts.nr, min.value, max.value),
                   ncol=crits.nr, nrow=alts.nr)
   while(TRUE) {
-    has.domination <- FALSE
+    had.domination <- FALSE
     for(i in 1:(alts.nr-1)) {
       for(j in (i+1):alts.nr) {
         while(isDominated(perfs, i, j) || isDominated(perfs, j, i)) {
-          has.domination <- TRUE
+          had.domination <- TRUE
           perfs[i,] <- runif(crits.nr, min.value, max.value)
           perfs[j,] <- runif(crits.nr, min.value, max.value)
         }
@@ -23,12 +23,32 @@ generatePerformances <- function(crits.nr, alts.nr, min.value = 0, max.value = 1
         break
       }
     }
-    if (!has.domination && !has.duplications) {
+    if (!had.domination && !has.duplications) {
       break
     }
   }
   
   return(perfs)
+}
+
+generatePreferences <- function(perfs, preferences.nr) {
+  result <- matrix(0, ncol=2, nrow=preferences.nr)
+  alts.nr <- nrow(perfs)  
+  edges.max <- alts.nr * (alts.nr - 1) / 2
+  triangular.mat.indexes <- sample(edges.max, preferences.nr)
+  alts.indexes <- sample(alts.nr)
+  for (pref.idx in 1:preferences.nr) {
+    row.idx <- getTriangularMatrixRowIndex(triangular.mat.indexes[pref.idx], alts.nr)
+    col.idx <- getTriangularMatrixColumnIndex(triangular.mat.indexes[pref.idx], alts.nr)
+    result[pref.idx, 1] <- alts.indexes[row.idx]
+    result[pref.idx, 2] <- alts.indexes[col.idx]
+  }
+  return(result)
+}
+
+generateRankingPreferences <- function(perfs) {
+  result <- t(combn(sample(nrow(perfs)), 2))
+  return(result)
 }
 
 isDominated <- function(perfs, dominant.idx, dominated.idx) {
@@ -53,29 +73,4 @@ getTriangularMatrixColumnIndexUsingRowIndex <- function(value.idx, matrix.size, 
 getTriangularMatrixColumnIndex <- function(value.idx, matrix.size) {
   row <- getTriangularMatrixRowIndex(value.idx, matrix.size)
   return(getTriangularMatrixColumnIndexUsingRowIndex(value.idx, matrix.size, row))
-}
-
-generatePreferences <- function(perfs, preferences.nr) {
-  result <- matrix(0, ncol=2, nrow=preferences.nr)
-  alts.nr <- nrow(perfs)  
-  edges.max <- alts.nr * (alts.nr - 1) / 2
-  triangular.mat.indexes <- sample(edges.max, preferences.nr)
-  alts.indexes <- sample(alts.nr)
-  for (pref.idx in 1:preferences.nr) {
-    row.idx <- getTriangularMatrixRowIndex(triangular.mat.indexes[pref.idx], alts.nr)
-    col.idx <- getTriangularMatrixColumnIndex(triangular.mat.indexes[pref.idx], alts.nr)
-    result[pref.idx, 1] <- alts.indexes[row.idx]
-    result[pref.idx, 2] <- alts.indexes[col.idx]
-  }
-  return(result)
-}
-
-generatePreferences <- function(perfs, preferences.nr) {
-  rank <- generateRankingPreferences(perfs)
-  return(rank[sample(nrow(rank), size=preferences.nr, replace=FALSE),])
-}
-
-generateRankingPreferences <- function(perfs) {
-  result <- t(combn(sample(nrow(perfs)), 2))
-  return(result)
 }

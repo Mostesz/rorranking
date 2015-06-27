@@ -1,22 +1,25 @@
 getCharacteristicPoints <- function(perf, nums.of.characteristic.points,
-                                    discretization.algorithm.type = 'EQUAL_WIDTH_INTERVAL',
+                                    discretization.method = 'EQUAL_WIDTH_INTERVAL',
                                     strong.prefs = NULL,
                                     weak.prefs = NULL,
                                     indif.prefs = NULL) {
-  if (!discretization.algorithm.type %in% getDiscretizationAlgorithmsTypes()) {
+  if (is.null(discretization.method)) {
+    discretization.method <- 'EQUAL_WIDTH_INTERVAL'
+  }
+  if (!discretization.method %in% getDiscretizationAlgorithmsTypes()) {
     stop(paste("Argument 'discretizationAlgorithmType' must be a vector of either ",
                paste(getDiscretizationAlgorithmsTypes(), collapse=", "), collapse=""))
   }
   
-  switch(discretization.algorithm.type,
+  switch(discretization.method,
          EQUAL_WIDTH_INTERVAL = {
            getCharacteristicPointsEqualWidthInterval(perf, nums.of.characteristic.points)
          },
          EQUAL_FREQ_INTERVAL = {
-           getCharacteristicPoints(perf, nums.of.characteristic.points, 'frequency')
+           getGeneralCharacteristicPoints(perf, nums.of.characteristic.points, 'frequency')
          },
          K_MEANS = {
-           getCharacteristicPoints(perf, nums.of.characteristic.points, 'cluster')
+           getCharacteristicPointsKMeans(perf, nums.of.characteristic.points)
          },
          KERNEL_DENSITY_ESTIMATION = {
            getCharacteristicPointsKernelDensityEstimation(perf, nums.of.characteristic.points)
@@ -119,7 +122,7 @@ getCharacteristicPointsKernelDensityEstimation <- function(perf, nums.of.charact
 }
 
 kernelFunction <- function(x1,x2,h) {
-  return(( 1 / ( (sqrt(2*pi)) * (h/6)) ) * exp( (-(x1-x2)^2) / (2*(h/6)^2) ));
+  return(( 1 / ( (sqrt(2*pi)) * (h/6)) ) * exp( (-(x1-x2)^2) / (2*(h/6)^2) ))
 }
 
 getCharacteristicPointsKMeans <- function(perf, nums.of.characteristic.points) {
@@ -128,7 +131,7 @@ getCharacteristicPointsKMeans <- function(perf, nums.of.characteristic.points) {
   list.of.characteristic.points <- list()  
   for (i in 1:nr.crit) {
     crit.values <- sort(perf[,i])
-    clusters.assignments <- Kmeans(crit.values, intervals.numbers[i], iter.max=100, method = "euclidean")$cluster
+    clusters.assignments <- Kmeans(crit.values, intervals.numbers[i], iter.max=10, method = "euclidean")$cluster
     
     charac.points = c()
     last.assignment <- NULL
@@ -199,7 +202,7 @@ getCharacteristicPointsGhaderi <- function(perf, nums.of.characteristic.points,
   return(list.of.characteristic.points)
 }
 
-getCharacteristicPoints <- function(perf, nums.of.characteristic.points, method.name) {
+getGeneralCharacteristicPoints <- function(perf, nums.of.characteristic.points, method.name) {
   intervals.numbers = nums.of.characteristic.points - 1
   nr.crit <- ncol(perf)
   list.of.characteristic.points <- list()  

@@ -7,7 +7,6 @@ import(arules)
 import(amap)
 import(Rglpk)
 
-export(generatePerformances)
 export(findAllRankRelatedPreferentionalReductsHierarchical)
 export(findAllRankRelatedPreferentionalReducts)
 export(findExtremeRanksHierarchical)
