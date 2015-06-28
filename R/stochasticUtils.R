@@ -261,5 +261,3 @@ convertToHitandrunProblem <- function(model) {
   names(model)[1] <- "constr"
   return(model)  
 }
-
-
