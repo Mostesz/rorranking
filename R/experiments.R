@@ -2,7 +2,7 @@ runExperiment <- function(results.base.dir,
                           matrix.sizes, generating.perfs.number,
                           preferences.numbers.list, repetitions.number.per.pref,
                           examined.chact.points.numbers,
-                          distribution = 'NORMAL',
+                          distribution = 'UNIFORM',
                           examine.robustness=TRUE) {
   if (!file.exists(results.base.dir)) {
     stop('Given base directory does not exist')

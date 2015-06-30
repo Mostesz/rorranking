@@ -2,11 +2,11 @@ generatePerformances <- function(crits.nr, alts.nr, distribution) {
   if (crits.nr < 2) {
     stop('Criteria number must be greater or equal 2')
   }
-  if (!(distribution %in% c('NORMAL', 'SKEW_NORMAL'))) {
+  if (!(distribution %in% c('UNIFORM', 'SKEW_NORMAL'))) {
     stop('Incorrect distribution type')
   }
   
-  if (distribution == 'NORMAL') {
+  if (distribution == 'UNIFORM') {
     genVector <- genRandomVectorNormalDistribution
   } else if (distribution == 'SKEW_NORMAL') {
     genVector <- genRandomVectorSkewNormalDistribution
