@@ -1,18 +1,25 @@
-generatePerformances <- function(crits.nr, alts.nr, min.value = 0, max.value = 1) {
+generatePerformances <- function(crits.nr, alts.nr, distribution) {
   if (crits.nr < 2) {
     stop('Criteria number must be greater or equal 2')
   }
+  if (!(distribution %in% c('NORMAL', 'SKEW_NORMAL'))) {
+    stop('Incorrect distribution type')
+  }
   
-  perfs <- matrix(runif(crits.nr * alts.nr, min.value, max.value),
-                  ncol=crits.nr, nrow=alts.nr)
+  if (distribution == 'NORMAL') {
+    genVector <- genRandomVectorNormalDistribution
+  } else if (distribution == 'SKEW_NORMAL') {
+    genVector <- genRandomVectorSkewNormalDistribution
+  }
+  perfs <- matrix(genVector(crits.nr * alts.nr), ncol=crits.nr, nrow=alts.nr)
   while(TRUE) {
     had.domination <- FALSE
     for(i in 1:(alts.nr-1)) {
       for(j in (i+1):alts.nr) {
         while(isDominated(perfs, i, j) || isDominated(perfs, j, i)) {
           had.domination <- TRUE
-          perfs[i,] <- runif(crits.nr, min.value, max.value)
-          perfs[j,] <- runif(crits.nr, min.value, max.value)
+          perfs[i,] <- genVector(crits.nr)
+          perfs[j,] <- genVector(crits.nr)
         }
       }
     }
@@ -29,6 +36,14 @@ generatePerformances <- function(crits.nr, alts.nr, min.value = 0, max.value = 1
   }
   
   return(perfs)
+}
+
+genRandomVectorNormalDistribution <- function(n) {
+  return(runif(n, 0, 1))
+}
+
+genRandomVectorSkewNormalDistribution <- function(n) {
+  return(rsn(n, 5, 2, 5))
 }
 
 generatePreferences <- function(perfs, preferences.nr) {

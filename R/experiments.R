@@ -2,6 +2,7 @@ runExperiment <- function(results.base.dir,
                           matrix.sizes, generating.perfs.number,
                           preferences.numbers.list, repetitions.number.per.pref,
                           examined.chact.points.numbers,
+                          distribution = 'NORMAL',
                           examine.robustness=TRUE) {
   if (!file.exists(results.base.dir)) {
     stop('Given base directory does not exist')
@@ -33,6 +34,7 @@ runExperiment <- function(results.base.dir,
         series.result <- runSeries(crits.nr, alts.nr, generating.perfs.number,
                                    preferences.number, repetitions.number.per.pref,
                                    pref.model,
+                                   distribution,
                                    examine.robustness)
         write.csv(series.result$eps.values, file=file.path(pref.model.dir.path, 'eps.values'))
         write.csv(series.result$found.solutions, file=file.path(pref.model.dir.path, 'found.solutions'))
@@ -48,6 +50,7 @@ runExperiment <- function(results.base.dir,
 runSeries <- function(crits.nr, alts.nr, generating.perfs.number,
                       preferences.number, repetitions.number.per.pref,
                       pref.model,
+                      distribution,
                       examine.robustness) {
   perfs.names <- paste('m', 1:generating.perfs.number, sep='')
   
@@ -60,7 +63,7 @@ runSeries <- function(crits.nr, alts.nr, generating.perfs.number,
   pref.ind.relations.numbers.df <- data.frame(matrix(ncol=length(perfs.names), nrow=repetitions.number.per.pref))
   colnames(pref.ind.relations.numbers.df) <- perfs.names
   for(perfs.name in perfs.names) {
-    perfs <- generatePerformances(crits.nr, alts.nr)
+    perfs <- generatePerformances(crits.nr, alts.nr, distribution)
     
     for (pref.repetition.idx in 1:repetitions.number.per.pref) {
       preferences <- getPreferences(perfs, preferences.number)

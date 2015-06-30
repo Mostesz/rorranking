@@ -6,6 +6,7 @@ import(hitandrun)
 import(arules)
 import(amap)
 import(Rglpk)
+import(sn)
 
 export(runExperiment)
 export(findAllRankRelatedPreferentionalReductsHierarchical)
