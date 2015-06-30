@@ -10,6 +10,9 @@ runExperiment <- function(results.base.dir,
       unlink(dir.to.rm, recursive=TRUE)
     }
   }
+  
+  start.time <- Sys.time()
+  
   for (m.size.idx in 1:nrow(matrix.sizes)) {
     crits.nr <- matrix.sizes[m.size.idx,1]
     alts.nr <- matrix.sizes[m.size.idx,2]
@@ -38,6 +41,8 @@ runExperiment <- function(results.base.dir,
       }
     }
   }
+  
+  print(Sys.time() - start.time)
 }
 
 runSeries <- function(crits.nr, alts.nr, generating.perfs.number,
