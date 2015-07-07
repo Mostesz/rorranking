@@ -109,7 +109,7 @@ findSolution <- function(perfs, preferences,
   params <- getFuncParameters(func.type, charact.points.number, discretization.method, crits.nr)
   
   solution <- findPreferenceRelations(perfs, 
-                                      TRUE, 
+                                      FALSE, 
                                       strong.prefs = preferences,
                                       nums.of.characteristic.points = params$nums.of.characteristic.points,
                                       discretization.method = params$discretization.method,
