@@ -12,6 +12,8 @@ source('rorranking/R/representativeValueFunction.R')
 source('rorranking/R/stochasticInterface.R')
 source('rorranking/R/stochasticUtils.R')
 
+source('rorranking/R/experiments.R')
+
 print('extreme ranking analysis:')
 test_file('rorranking/inst/tests/eraTests.R')
 print('finding relations')
@@ -26,4 +28,7 @@ print('relations acceptability indices:')
 test_file('rorranking/inst/tests/stochasticRelationsTests.R')
 print('ranks acceptability indices')
 test_file('rorranking/inst/tests/stochasticRanksTests.R')
+
+print('experiments tests')
+test_file('rorranking/inst/tests/experimentsTest.R')
 print('DONE')

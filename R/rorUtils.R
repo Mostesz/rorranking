@@ -829,7 +829,7 @@ checkConstraintsConsistency <- function(model, number.of.real.variables, eps.pos
   #    model$rhs: matrix - right side of constraints
   ret <- solveModel( model=model, number.of.real.variables=number.of.real.variables, eps.position)
   
-  result <- list(status=(ret$status$code == 0 && ret$objval >= MINEPS))
+  result <- list(status=(ret$status$code == 0 && !is.na(ret$objval) && ret$objval >= MINEPS))
   if (result$status) {
     result$eps <- ret$solution[eps.position]
   }
