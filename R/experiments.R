@@ -125,7 +125,7 @@ launchRobustnessExperiment <- function(perfs,
   for (pref.repetition.idx in 1:pref.repetitions.number.expr) {
     examine.robustness <- pref.repetition.idx <= pref.repetitions.number.rbst && !is.null(preferences.number)
     
-    preferences <- getPreferences(perfs, preferences.number)#change to preferences from linear function
+    preferences <- getPreferences(perfs, preferences.number, using.linear.func=TRUE)
     solution <- findSolution(perfs, preferences,
                              func.type=pref.model$func.type,
                              charact.points.number=pref.model$charact.points.number,
@@ -333,9 +333,11 @@ getAllPreferencesModels <- function(examined.charact.points.numbers, crits.nr) {
   return(result)
 }
 
-getPreferences <- function(perfs, preferences.number) {
+getPreferences <- function(perfs, preferences.number, using.linear.func=FALSE) {
   if (is.null(preferences.number)) {
     return(generateRankingPreferences(perfs))
+  } else if (using.linear.func) {
+    return(generatePreferencesFromLinearFunc(perfs, preferences.number))
   } else {
     return(generatePreferences(perfs, preferences.number))
   }

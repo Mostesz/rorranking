@@ -62,7 +62,17 @@ generatePreferences <- function(perfs, preferences.nr) {
 }
 
 generatePreferencesFromLinearFunc <- function(perfs, preferences.nr) {
-  return(generatePreferences(perfs, preferences.nr))
+  crits.nr <- ncol(perfs)
+  
+  max.utilities <- runif(crits.nr)
+  max.utilities <- max.utilities / sum(max.utilities)
+  max.grades <- apply(perfs, 2, max)
+  slopes <- max.utilities / max.grades
+  
+  perfs.utilities <- t(t(perfs) * slopes)
+  ranking <- t(combn(sort(rowSums(perfs.utilities), index.return=TRUE)$ix, 2))
+  
+  return(ranking[sample(nrow(ranking), size=preferences.nr),])
 }
 
 generateRankingPreferences <- function(perfs) {
