@@ -2,7 +2,8 @@ launchAllExperiments <- function(results.base.dir,
                                  matrix.sizes, generating.perfs.number,
                                  preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
                                  examined.chact.points.numbers) {
-  for(perf.idx in generating.perfs.number) {
+  for(perf.idx in 1:generating.perfs.number) {
+    print(paste('/////////////// PROBLEM REPETITION NO:', perf.idx))
     perfs <- NULL
     
     perfs.processing.time <- Sys.time()
@@ -10,6 +11,8 @@ launchAllExperiments <- function(results.base.dir,
     for (distribution in c('UNIFORM', 'SKEW_NORMAL')){
       matrix.sizes.results <- list()
       for (m.size.idx in 1:nrow(matrix.sizes)) {
+        single.problem.processing.time <- Sys.time()
+        
         crits.nr <- matrix.sizes[m.size.idx,1]
         alts.nr <- matrix.sizes[m.size.idx,2]
         if(is.null(perfs)) {
@@ -25,13 +28,17 @@ launchAllExperiments <- function(results.base.dir,
                                             preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
                                             examined.chact.points.numbers)
         matrix.sizes.results[[matrix.size.dir.name]] <- res
+        
+        print('Matrix size execution time:')
+        print(Sys.time() - single.problem.processing.time)
       }
       results[[distribution]] <- matrix.sizes.results
     }
     print('Results saving... Please do not terminate the script.')
     saveResults(results.base.dir, results)
     print('Saving finished.')
-    print(Sys.time() - start.time)
+    print('Repetition execution time:')
+    print(Sys.time() - perfs.processing.time)
   }
 }
 
@@ -80,6 +87,7 @@ launchAllExperimentsForPerfs <- function(perfs,
       if (pref.model$func.type == 'SEGMENTED') {
         pref.model.dir.name <- paste(pref.model$func.type, pref.model$charact.points.number, pref.model$discretization.method, sep='-')
       }
+      print(paste('>>', paste(pref.model.dir.name, preferences.type.dir.name, sep=', ')))
       
       exp.res <- launchExpressivenessExperiment(perfs,
                                                 preferences.number, pref.repetitions.number.expr,
@@ -105,7 +113,7 @@ launchExpressivenessExperiment <- function(perfs,
     preferences <- getPreferences(perfs, preferences.number)
     solution <- findSolution(perfs, preferences,
                              func.type=pref.model$func.type,
-                             charact.points.number=pref.model$charact.points.number,
+                             charact.points.number=rep(pref.model$charact.points.number, ncol(perfs)),
                              discretization.method=pref.model$discretization.method,
                              check.consistency.only=TRUE)
     if (solution$found.solution) {
@@ -128,7 +136,7 @@ launchRobustnessExperiment <- function(perfs,
     preferences <- getPreferences(perfs, preferences.number, using.linear.func=TRUE)
     solution <- findSolution(perfs, preferences,
                              func.type=pref.model$func.type,
-                             charact.points.number=pref.model$charact.points.number,
+                             charact.points.number=rep(pref.model$charact.points.number, ncol(perfs)),
                              discretization.method=pref.model$discretization.method,
                              check.consistency.only=!examine.robustness)
     if (solution$found.solution) {
@@ -138,7 +146,7 @@ launchRobustnessExperiment <- function(perfs,
         relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
         pref.ind.relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
         
-        rel.no <- computeRelationsNumbers(solution$nec.relations, preferences, alts.nr)
+        rel.no <- computeRelationsNumbers(solution$nec.relations, preferences, nrow(perfs))
         relations.numbers[1, pref.repetition.idx] <- rel.no$relations.numbers
         pref.ind.relations.numbers[1, pref.repetition.idx] <- rel.no$pref.independent.relations.number
       }
@@ -232,7 +240,7 @@ runSeries <- function(crits.nr, alts.nr, generating.perfs.number,
       preferences <- getPreferences(perfs, preferences.number)
       solution <- findSolution(perfs, preferences,
                                func.type=pref.model$func.type,
-                               charact.points.number=pref.model$charact.points.number,
+                               charact.points.number=rep(pref.model$charact.points.number, crits.nr),
                                discretization.method=pref.model$discretization.method,
                                check.consistency.only=!examine.robustness)
       if (solution$found.solution) {
@@ -320,7 +328,7 @@ getAllPreferencesModels <- function(examined.charact.points.numbers, crits.nr) {
       for (discretization.method in getDiscretizationAlgorithmsTypes()) {
         for (charact.points in examined.charact.points.numbers) {
           result[[pref.idx]] <- list(func.type=func.type,
-                                     charact.points.number=rep(charact.points, crits.nr),
+                                     charact.points.number=charact.points,
                                      discretization.method=discretization.method)
           pref.idx = pref.idx + 1
         }
