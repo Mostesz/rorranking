@@ -61,6 +61,10 @@ generatePreferences <- function(perfs, preferences.nr) {
   return(result)
 }
 
+generatePreferencesFromLinearFunc <- function(perfs, preferences.nr) {
+  return(generatePreferences(perfs, preferences.nr))
+}
+
 generateRankingPreferences <- function(perfs) {
   result <- t(combn(sample(nrow(perfs)), 2))
   return(result)

@@ -9,6 +9,7 @@ import(Rglpk)
 import(sn)
 
 export(runExperiment)
+export(launchAllExperiments)
 export(findAllRankRelatedPreferentionalReductsHierarchical)
 export(findAllRankRelatedPreferentionalReducts)
 export(findExtremeRanksHierarchical)

@@ -1,3 +1,157 @@
+launchAllExperiments <- function(results.base.dir,
+                                 matrix.sizes, generating.perfs.number,
+                                 preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
+                                 examined.chact.points.numbers) {
+  for(perf.idx in generating.perfs.number) {
+    perfs <- NULL
+    
+    perfs.processing.time <- Sys.time()
+    results <- list()
+    for (distribution in c('UNIFORM', 'SKEW_NORMAL')){
+      matrix.sizes.results <- list()
+      for (m.size.idx in 1:nrow(matrix.sizes)) {
+        crits.nr <- matrix.sizes[m.size.idx,1]
+        alts.nr <- matrix.sizes[m.size.idx,2]
+        if(is.null(perfs)) {
+          perfs <- generatePerformances(crits.nr, alts.nr, distribution)
+        }
+        matrix.size.dir.name <- paste(crits.nr, alts.nr, sep='x')
+        
+        print(paste(matrix.size.dir.name, distribution))
+        
+        series.path <- file.path(results.base.dir, matrix.size.dir.name, distribution)
+        
+        res <- launchAllExperimentsForPerfs(perfs,
+                                            preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
+                                            examined.chact.points.numbers)
+        matrix.sizes.results[[matrix.size.dir.name]] <- res
+      }
+      results[[distribution]] <- matrix.sizes.results
+    }
+    print('Results saving... Please do not terminate the script.')
+    saveResults(results.base.dir, results)
+    print('Saving finished.')
+    print(Sys.time() - start.time)
+  }
+}
+
+saveResultsForPerfs <- function(results.base.dir, results) {
+  for(distributions.dir in names(results)) {
+    distributions.results <- results[[distributions.dir]]
+    for(m.sizes.dir in names(distributions.results)) {
+      m.sizes.results <- distributions.results[[m.sizes.dir]]
+      for(pref.type.dir in names(m.sizes.results)) {
+        pref.type.results <- m.sizes.results[[pref.type.dir]]
+        for(pref.model.dir in names(pref.type.results)) {
+          results <- pref.type.results[pref.model.dir]
+          path <- file.path(results.base.dir, distributions.dir, m.sizes.dir, pref.type.dir, pref.model.dir)
+          if (!file.exists(path)) {
+            dir.create(path, recursive=TRUE)
+          }
+          write.table(results$found.solutions.number, file=file.path(path, 'foundsolutionsnumber.csv'), append=T, row.names=F, col.names=F, sep=',')
+          write.table(results$eps.values, file=file.path(path, 'epsvalues.csv'), append=T, row.names=F, col.names=F, sep=',')
+          if (!is.null(results$relations.numbers)) {
+            write.table(results$relations.numbers, file=file.path(path, 'relationsnumbers.csv'), append=T, row.names=F, col.names=F, sep=',')
+          }
+          if (!is.null(results$pref.ind.relations.numbers)) {
+            write.table(results$pref.ind.relations.numbers, file=file.path(path, 'prefindrelationsnumbers.csv'), append=T, row.names=F, col.names=F, sep=',')
+          }
+        }
+      }
+    }
+  }
+}
+
+launchAllExperimentsForPerfs <- function(perfs,
+                                         preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
+                                         examined.chact.points.numbers) {
+  preferences.types.results <- list()
+  for (preferences.number in preferences.numbers.list) {
+    if (!is.null(preferences.number) && nrow(perfs)*(nrow(perfs)-1)/2 < preferences.number) {
+      break
+    }
+    
+    preferences.type.dir.name <- if (is.null(preferences.number)) 'ranking' else paste('pref', preferences.number, sep='-')
+    preferences.models.list = getAllPreferencesModels(examined.chact.points.numbers, ncol(perfs))
+    
+    models.results <- list()
+    for (pref.model in preferences.models.list) {
+      pref.model.dir.name <- pref.model$func.type
+      if (pref.model$func.type == 'SEGMENTED') {
+        pref.model.dir.name <- paste(pref.model$func.type, pref.model$charact.points.number, pref.model$discretization.method, sep='-')
+      }
+      
+      exp.res <- launchExpressivenessExperiment(perfs,
+                                                preferences.number, pref.repetitions.number.expr,
+                                                pref.model)
+      rob.res <- launchRobustnessExperiment(perfs,
+                                            preferences.number, pref.repetitions.number.expr, pref.repetitions.number.rbst,
+                                            pref.model)
+      res <- rob.res
+      res$found.solutions.number <- exp.res
+      
+      models.results[[pref.model.dir.name]] <- res
+    }
+    preferences.types.results[[preferences.type.dir.name]] <- models.results
+  }
+  return(preferences.types.results)
+}
+
+launchExpressivenessExperiment <- function(perfs,
+                                           preferences.number, pref.repetitions.number.expr,
+                                           pref.model) {
+  found.solutions.number <- 0
+  for (pref.repetition.idx in 1:pref.repetitions.number.expr) {
+    preferences <- getPreferences(perfs, preferences.number)
+    solution <- findSolution(perfs, preferences,
+                             func.type=pref.model$func.type,
+                             charact.points.number=pref.model$charact.points.number,
+                             discretization.method=pref.model$discretization.method,
+                             check.consistency.only=TRUE)
+    if (solution$found.solution) {
+      found.solutions.number <- found.solutions.number + 1
+    }
+  }
+  return(found.solutions.number)
+}
+
+launchRobustnessExperiment <- function(perfs,
+                                       preferences.number, pref.repetitions.number.expr, pref.repetitions.number.rbst,
+                                       pref.model) {
+  eps.values <- matrix(ncol=pref.repetitions.number.expr, nrow=1)
+  relations.numbers <- NULL
+  pref.ind.relations.numbers <- NULL
+  
+  for (pref.repetition.idx in 1:pref.repetitions.number.expr) {
+    examine.robustness <- pref.repetition.idx <= pref.repetitions.number.rbst && !is.null(preferences.number)
+    
+    preferences <- getPreferences(perfs, preferences.number)#change to preferences from linear function
+    solution <- findSolution(perfs, preferences,
+                             func.type=pref.model$func.type,
+                             charact.points.number=pref.model$charact.points.number,
+                             discretization.method=pref.model$discretization.method,
+                             check.consistency.only=!examine.robustness)
+    if (solution$found.solution) {
+      eps.values[1, pref.repetition.idx] <- solution$eps
+      
+      if (examine.robustness) {
+        relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
+        pref.ind.relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
+        
+        rel.no <- computeRelationsNumbers(solution$nec.relations, preferences, alts.nr)
+        relations.numbers[1, pref.repetition.idx] <- rel.no$relations.numbers
+        pref.ind.relations.numbers[1, pref.repetition.idx] <- rel.no$pref.independent.relations.number
+      }
+    }
+  }
+  
+  return(list(
+    eps.values=eps.values,
+    relations.numbers=relations.numbers,
+    pref.ind.relations.numbers=pref.ind.relations.numbers
+    ))
+}
+
 runExperiment <- function(results.base.dir,
                           matrix.sizes, generating.perfs.number,
                           preferences.numbers.list, repetitions.number.per.pref,
@@ -23,7 +177,7 @@ runExperiment <- function(results.base.dir,
     for (preferences.number in preferences.numbers.list) {
       preferences.type.dir.name <- if (is.null(preferences.number)) 'ranking' else paste('pref', preferences.number, sep='-')
       
-      preferences.models.list = getAllPreferencesModels(examined.chact.points.numbers)
+      preferences.models.list = getAllPreferencesModels(examined.chact.points.numbers, crits.nr)
       for (pref.model in preferences.models.list) {
         series.start.time <- Sys.time()
         
@@ -78,26 +232,16 @@ runSeries <- function(crits.nr, alts.nr, generating.perfs.number,
       preferences <- getPreferences(perfs, preferences.number)
       solution <- findSolution(perfs, preferences,
                                func.type=pref.model$func.type,
-                               charact.points.number=rep(pref.model$charact.points.number, crits.nr),
+                               charact.points.number=pref.model$charact.points.number,
                                discretization.method=pref.model$discretization.method,
                                check.consistency.only=!examine.robustness)
       if (solution$found.solution) {
         eps.values.df[found.sol.idx, perfs.name] <- solution$eps
         found.solutions.df[1, perfs.name] <- found.solutions.df[1, perfs.name] + 1
         if (examine.robustness) {
-          relations.numbers.df[found.sol.idx, perfs.name] <- sum(solution$nec.relations)
-          
-          pref.adj.matrix <- convertAdjacencyListToAdjacencyMatrix(preferences, alts.nr)
-          pref.adj.matrix <- findTransitiveClosure(pref.adj.matrix)
-          pref.independent.relations.number <- 0
-          for (i in nrow(pref.adj.matrix)) {
-            for (j in ncol(pref.adj.matrix)) {
-              if (i != j && solution$nec.relations[i,j] && !pref.adj.matrix[i,j]) {
-                pref.independent.relations.number <- pref.independent.relations.number + 1
-              }
-            }
-          }
-          pref.ind.relations.numbers.df[found.sol.idx, perfs.name] <- pref.independent.relations.number
+          robustness.relations.numbers <- computeRelationsNumbers(solution$nec.relations, preferences, alts.nr)
+          relations.numbers.df[found.sol.idx, perfs.name] <- robustness.relations.numbers$relations.numbers
+          pref.ind.relations.numbers.df[found.sol.idx, perfs.name] <- robustness.relations.numbers$pref.independent.relations.number
         }
         found.sol.idx <- found.sol.idx + 1
       }
@@ -107,6 +251,24 @@ runSeries <- function(crits.nr, alts.nr, generating.perfs.number,
               found.solutions=found.solutions.df,
               relations.numbers=relations.numbers.df,
               pref.ind.relations.numbers=pref.ind.relations.numbers.df))
+}
+
+computeRelationsNumbers <- function(nec.relations, preferences, alts.nr) {
+  relations.numbers <- sum(nec.relations)
+  
+  pref.adj.matrix <- convertAdjacencyListToAdjacencyMatrix(preferences, alts.nr)
+  pref.adj.matrix <- findTransitiveClosure(pref.adj.matrix)
+  pref.independent.relations.number <- 0
+  for (i in nrow(pref.adj.matrix)) {
+    for (j in ncol(pref.adj.matrix)) {
+      if (i != j && nec.relations[i,j] && !pref.adj.matrix[i,j]) {
+        pref.independent.relations.number <- pref.independent.relations.number + 1
+      }
+    }
+  }
+  return(list(
+    relations.numbers=relations.numbers,
+    pref.independent.relations.number=pref.independent.relations.number))
 }
 
 findSolution <- function(perfs, preferences,
@@ -150,7 +312,7 @@ findTransitiveClosure <- function(matrix) {
   return(matrix)
 }
 
-getAllPreferencesModels <- function(examined.charact.points.numbers) {
+getAllPreferencesModels <- function(examined.charact.points.numbers, crits.nr) {
   result <- list()
   pref.idx = 1
   for (func.type in c('LINEAR', 'GENERAL', 'SEGMENTED')) {
@@ -158,7 +320,7 @@ getAllPreferencesModels <- function(examined.charact.points.numbers) {
       for (discretization.method in getDiscretizationAlgorithmsTypes()) {
         for (charact.points in examined.charact.points.numbers) {
           result[[pref.idx]] <- list(func.type=func.type,
-                                     charact.points.number=charact.points,
+                                     charact.points.number=rep(charact.points, crits.nr),
                                      discretization.method=discretization.method)
           pref.idx = pref.idx + 1
         }
