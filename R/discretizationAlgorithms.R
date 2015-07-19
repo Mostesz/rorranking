@@ -1,4 +1,4 @@
-getCharacteristicPoints <- function(perf, nums.of.characteristic.points,
+getCharacteristicPoints <- function(perfs, nums.of.characteristic.points,
                                     discretization.method = 'EQUAL_WIDTH_INTERVAL',
                                     strong.prefs = NULL,
                                     weak.prefs = NULL,
@@ -13,19 +13,19 @@ getCharacteristicPoints <- function(perf, nums.of.characteristic.points,
   
   switch(discretization.method,
          EQUAL_WIDTH_INTERVAL = {
-           getCharacteristicPointsEqualWidthInterval(perf, nums.of.characteristic.points)
+           getCharacteristicPointsEqualWidthInterval(perfs, nums.of.characteristic.points)
          },
          EQUAL_FREQ_INTERVAL = {
-           getGeneralCharacteristicPoints(perf, nums.of.characteristic.points, 'frequency')
+           getCharacteristicPointsEqualFreqInterval(perfs, nums.of.characteristic.points)
          },
          K_MEANS = {
-           getCharacteristicPointsKMeans(perf, nums.of.characteristic.points)
+           getCharacteristicPointsKMeans(perfs, nums.of.characteristic.points)
          },
          KERNEL_DENSITY_ESTIMATION = {
-           getCharacteristicPointsKernelDensityEstimation(perf, nums.of.characteristic.points)
+           getCharacteristicPointsKernelDensityEstimation(perfs, nums.of.characteristic.points)
          },
          GHADERI_DISCRETIZATION = {
-           getCharacteristicPointsGhaderi(perf, nums.of.characteristic.points, 
+           getCharacteristicPointsGhaderi(perfs, nums.of.characteristic.points, 
                                           strong.prefs, weak.prefs, indif.prefs)
          }
   )
@@ -41,13 +41,13 @@ getDiscretizationAlgorithmsTypes <- function() {
   ));
 }
 
-getCharacteristicPointsKernelDensityEstimation <- function(perf, nums.of.characteristic.points) {
+getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.characteristic.points) {
   intervals.numbers = nums.of.characteristic.points - 1
   list.of.characteristic.points <- list()
   
-  nr.crit <- ncol(perf)
+  nr.crit <- ncol(perfs)
   for (i in 1:nr.crit) {
-    instances <- sort(perf[,i])
+    instances <- sort(perfs[,i])
     unique.instances <- unique(instances)
     
     candidates <- list()
@@ -125,12 +125,12 @@ kernelFunction <- function(x1,x2,h) {
   return(( 1 / ( (sqrt(2*pi)) * (h/6)) ) * exp( (-(x1-x2)^2) / (2*(h/6)^2) ))
 }
 
-getCharacteristicPointsKMeans <- function(perf, nums.of.characteristic.points) {
+getCharacteristicPointsKMeans <- function(perfs, nums.of.characteristic.points) {
   intervals.numbers = nums.of.characteristic.points - 1
-  nr.crit <- ncol(perf)
+  nr.crit <- ncol(perfs)
   list.of.characteristic.points <- list()  
   for (i in 1:nr.crit) {
-    crit.values <- sort(perf[,i])
+    crit.values <- sort(perfs[,i])
     clusters.assignments <- Kmeans(crit.values, intervals.numbers[i], iter.max=10, method = "euclidean")$cluster
     
     charac.points = c()
@@ -150,17 +150,17 @@ getCharacteristicPointsKMeans <- function(perf, nums.of.characteristic.points) {
   return(list.of.characteristic.points)
 }
 
-getCharacteristicPointsGhaderi <- function(perf, nums.of.characteristic.points,
+getCharacteristicPointsGhaderi <- function(perfs, nums.of.characteristic.points,
                                            strong.prefs, weak.prefs, indif.prefs) {
   intervals.numbers = nums.of.characteristic.points - 1
   preferences = rbind(strong.prefs, weak.prefs, indif.prefs)
   
-  nr.crit <- ncol(perf)
-  nr.alts <- nrow(perf)
-  levels.list <- getLevels(perf);
+  nr.crit <- ncol(perfs)
+  nr.alts <- nrow(perfs)
+  levels.list <- getLevels(perfs);
   list.of.characteristic.points <- list()  
   for (i in 1:nr.crit) {
-    att.values = sort(perf[,i])
+    att.values = sort(perfs[,i])
     levels <- levels.list[[i]]
     candidates <- vector(mode='numeric', length=length(levels)-1)
     for (j in 1:(length(levels)-1)) {
@@ -170,10 +170,10 @@ getCharacteristicPointsGhaderi <- function(perf, nums.of.characteristic.points,
     candidates.obj <- vector(mode='numeric', length=length(candidates))
     if (length(preferences) > 0) {
       for (preference.idx in 1:nrow(preferences)) {
-        left.perf <- perf[preferences[preference.idx, 1], i]
-        right.perf <- perf[preferences[preference.idx, 2], i]
+        left.perfs <- perfs[preferences[preference.idx, 1], i]
+        right.perfs <- perfs[preferences[preference.idx, 2], i]
         for (cand.idx in 1:length(candidates)) {
-          if (candidates[cand.idx] >= left.perf && candidates[cand.idx] <= right.perf) {
+          if (candidates[cand.idx] >= left.perfs && candidates[cand.idx] <= right.perfs) {
             candidates.obj[cand.idx] <- candidates.obj[cand.idx] + 1
           }
         }
@@ -202,12 +202,12 @@ getCharacteristicPointsGhaderi <- function(perf, nums.of.characteristic.points,
   return(list.of.characteristic.points)
 }
 
-getGeneralCharacteristicPoints <- function(perf, nums.of.characteristic.points, method.name) {
+getGeneralCharacteristicPoints <- function(perfs, nums.of.characteristic.points, method.name) {
   intervals.numbers = nums.of.characteristic.points - 1
-  nr.crit <- ncol(perf)
+  nr.crit <- ncol(perfs)
   list.of.characteristic.points <- list()  
   for (i in 1:nr.crit) {
-    list.of.characteristic.points[[i]] <- discretize(perf[,i],
+    list.of.characteristic.points[[i]] <- discretize(perfs[,i],
                                                      method=method.name,
                                                      categories=intervals.numbers[i],
                                                      onlycuts=TRUE)
@@ -216,14 +216,44 @@ getGeneralCharacteristicPoints <- function(perf, nums.of.characteristic.points, 
   return(list.of.characteristic.points)
 }
 
-getCharacteristicPointsEqualWidthInterval <- function (perf, nums.of.characteristic.points) {
+getCharacteristicPointsEqualFreqInterval <- function(perfs, nums.of.characteristic.points) {
+  intervals.numbers = nums.of.characteristic.points - 1
+  list.of.characteristic.points <- list()
+  
+  nr.crit <- ncol(perfs)
+  nr.alts <- nrow(perfs)
+  for (i in 1:nr.crit) {
+    if (length(unique(perfs[,i])) != nr.alts) {
+      stop('The values of the criteria should be unique')
+    }
+    instances <- sort(perfs[,i])
+    nrepl <- floor(nr.alts / intervals.numbers[i])
+    rest <- nr.alts - nrepl * intervals.numbers[i]
+    
+    characteristic.points <- c(instances[1])
+    instances.idx <- 1
+    for(interval.idx in 1:intervals.numbers[i]) {
+      instances.idx <- instances.idx + nrepl
+      if (interval.idx <= rest) {
+        instances.idx <- instances.idx + 1
+      }
+      point <- (instances[min(instances.idx, nr.alts)] + instances[instances.idx-1])/2
+      characteristic.points <- c(characteristic.points, point)
+    }
+    
+    list.of.characteristic.points[[i]] <- characteristic.points
+  }
+  return(list.of.characteristic.points)
+}
+
+getCharacteristicPointsEqualWidthInterval <- function (perfs, nums.of.characteristic.points) {
   # Function return list of lists of characteristic points for each criterion
   # 
-  # perf: the performance matrix
+  # perfs: the performance matrix
   # nums.of.characteristic.points: list of nums of characteristic points for each criterion 
-  levels.list <- getLevels(perf);
+  levels.list <- getLevels(perfs);
   list.of.characteristic.points = list()
-  nr.crit <- ncol(perf)
+  nr.crit <- ncol(perfs)
   for (i in c(1:nr.crit)){  #dla każdego kryterium
     list.of.characteristic.points[[i]] = vector(mode="numeric", length=0)
     num.of.characteristic.points = nums.of.characteristic.points[i]

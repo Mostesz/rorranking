@@ -35,7 +35,7 @@ launchAllExperiments <- function(results.base.dir,
       results[[distribution]] <- matrix.sizes.results
     }
     print('Results saving... Please do not terminate the script.')
-    saveResults(results.base.dir, results)
+    saveResultsForPerfs(results.base.dir, results)
     print('Saving finished.')
     print('Repetition execution time:')
     print(Sys.time() - perfs.processing.time)
@@ -50,18 +50,21 @@ saveResultsForPerfs <- function(results.base.dir, results) {
       for(pref.type.dir in names(m.sizes.results)) {
         pref.type.results <- m.sizes.results[[pref.type.dir]]
         for(pref.model.dir in names(pref.type.results)) {
-          results <- pref.type.results[pref.model.dir]
+          series.result <- pref.type.results[[pref.model.dir]]
           path <- file.path(results.base.dir, distributions.dir, m.sizes.dir, pref.type.dir, pref.model.dir)
           if (!file.exists(path)) {
             dir.create(path, recursive=TRUE)
           }
-          write.table(results$found.solutions.number, file=file.path(path, 'foundsolutionsnumber.csv'), append=T, row.names=F, col.names=F, sep=',')
-          write.table(results$eps.values, file=file.path(path, 'epsvalues.csv'), append=T, row.names=F, col.names=F, sep=',')
-          if (!is.null(results$relations.numbers)) {
-            write.table(results$relations.numbers, file=file.path(path, 'relationsnumbers.csv'), append=T, row.names=F, col.names=F, sep=',')
+          write.table(series.result$found.solutions.number, file=file.path(path, 'foundsolutionsnumber.csv'), append=T, row.names=F, col.names=F, sep=',')
+          write.table(series.result$eps.values, file=file.path(path, 'epsvalues.csv'), append=T, row.names=F, col.names=F, sep=',')
+          if (!is.null(series.result$relations.numbers)) {
+            write.table(series.result$relations.numbers, file=file.path(path, 'relationsnumbers.csv'), append=T, row.names=F, col.names=F, sep=',')
           }
-          if (!is.null(results$pref.ind.relations.numbers)) {
-            write.table(results$pref.ind.relations.numbers, file=file.path(path, 'prefindrelationsnumbers.csv'), append=T, row.names=F, col.names=F, sep=',')
+          if (!is.null(series.result$pref.ind.relations.numbers)) {
+            write.table(series.result$pref.ind.relations.numbers, file=file.path(path, 'prefindrelationsnumbers.csv'), append=T, row.names=F, col.names=F, sep=',')
+          }
+          if (!is.null(series.result$found.solutions.number.robustness)) {
+            write.table(series.result$found.solutions.number.robustness, file=file.path(path, 'rob-foundsolutionsnumber.csv'), append=T, row.names=F, col.names=F, sep=',')
           }
         }
       }
@@ -127,11 +130,18 @@ launchRobustnessExperiment <- function(perfs,
                                        preferences.number, pref.repetitions.number.expr, pref.repetitions.number.rbst,
                                        pref.model) {
   eps.values <- matrix(ncol=pref.repetitions.number.expr, nrow=1)
+  not.found.solutions.number <- 0
+  found.solutions.number <- 0
+  
   relations.numbers <- NULL
   pref.ind.relations.numbers <- NULL
+  if (!is.null(preferences.number)) {
+    relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
+    pref.ind.relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
+  }
   
-  for (pref.repetition.idx in 1:pref.repetitions.number.expr) {
-    examine.robustness <- pref.repetition.idx <= pref.repetitions.number.rbst && !is.null(preferences.number)
+  for (pref.repetition.idx in 1:(pref.repetitions.number.expr*3)) {
+    examine.robustness <- (found.solutions.number < pref.repetitions.number.rbst) && !is.null(preferences.number)
     
     preferences <- getPreferences(perfs, preferences.number, using.linear.func=TRUE)
     solution <- findSolution(perfs, preferences,
@@ -140,23 +150,34 @@ launchRobustnessExperiment <- function(perfs,
                              discretization.method=pref.model$discretization.method,
                              check.consistency.only=!examine.robustness)
     if (solution$found.solution) {
-      eps.values[1, pref.repetition.idx] <- solution$eps
+      found.solutions.number <- found.solutions.number + 1
+      eps.values[1, found.solutions.number] <- solution$eps
       
       if (examine.robustness) {
-        relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
-        pref.ind.relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
-        
         rel.no <- computeRelationsNumbers(solution$nec.relations, preferences, nrow(perfs))
-        relations.numbers[1, pref.repetition.idx] <- rel.no$relations.numbers
-        pref.ind.relations.numbers[1, pref.repetition.idx] <- rel.no$pref.independent.relations.number
+        relations.numbers[1, found.solutions.number] <- rel.no$relations.numbers
+        pref.ind.relations.numbers[1, found.solutions.number] <- rel.no$pref.independent.relations.number
       }
+    } else {
+      not.found.solutions.number <- not.found.solutions.number + 1
     }
+    
+    if (found.solutions.number >= pref.repetitions.number.expr) {
+      break
+    }
+  }
+  
+  if (found.solutions.number < pref.repetitions.number.expr) {
+    print(paste('ERROR! Solutions have been found ', found.solutions.number, 'times'))
+  } else if (not.found.solutions.number > 0) {
+    print(paste('WARNING! Solutions have not been found ', not.found.solutions.number, 'times'))
   }
   
   return(list(
     eps.values=eps.values,
     relations.numbers=relations.numbers,
-    pref.ind.relations.numbers=pref.ind.relations.numbers
+    pref.ind.relations.numbers=pref.ind.relations.numbers,
+    found.solutions.number.robustness=found.solutions.number
     ))
 }
 
@@ -267,8 +288,8 @@ computeRelationsNumbers <- function(nec.relations, preferences, alts.nr) {
   pref.adj.matrix <- convertAdjacencyListToAdjacencyMatrix(preferences, alts.nr)
   pref.adj.matrix <- findTransitiveClosure(pref.adj.matrix)
   pref.independent.relations.number <- 0
-  for (i in nrow(pref.adj.matrix)) {
-    for (j in ncol(pref.adj.matrix)) {
+  for (i in 1:nrow(pref.adj.matrix)) {
+    for (j in 1:ncol(pref.adj.matrix)) {
       if (i != j && nec.relations[i,j] && !pref.adj.matrix[i,j]) {
         pref.independent.relations.number <- pref.independent.relations.number + 1
       }
@@ -343,11 +364,17 @@ getAllPreferencesModels <- function(examined.charact.points.numbers, crits.nr) {
 
 getPreferences <- function(perfs, preferences.number, using.linear.func=FALSE) {
   if (is.null(preferences.number)) {
-    return(generateRankingPreferences(perfs))
-  } else if (using.linear.func) {
-    return(generatePreferencesFromLinearFunc(perfs, preferences.number))
+    if (using.linear.func) {
+      return(generateRankingPreferencesFromLinearFunc(perfs))
+    } else {
+      return(generateRankingPreferences(perfs))
+    }
   } else {
-    return(generatePreferences(perfs, preferences.number))
+    if (using.linear.func) {
+      return(generatePreferencesFromLinearFunc(perfs, preferences.number))
+    } else {
+      return(generatePreferences(perfs, preferences.number))
+    }
   }
 }
 
