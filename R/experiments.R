@@ -168,7 +168,7 @@ launchRobustnessExperiment <- function(perfs,
   }
   
   if (found.solutions.number < pref.repetitions.number.expr) {
-    print(paste('ERROR! Solutions have been found ', found.solutions.number, 'times'))
+    stop(paste('ERROR! Solutions have been found ', found.solutions.number, 'times'))
   } else if (not.found.solutions.number > 0) {
     print(paste('WARNING! Solutions have not been found ', not.found.solutions.number, 'times'))
   }
