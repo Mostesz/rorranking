@@ -140,7 +140,7 @@ launchRobustnessExperiment <- function(perfs,
     pref.ind.relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
   }
   
-  for (pref.repetition.idx in 1:(pref.repetitions.number.expr*3)) {
+  for (pref.repetition.idx in 1:(pref.repetitions.number.expr*10)) {
     examine.robustness <- (found.solutions.number < pref.repetitions.number.rbst) && !is.null(preferences.number)
     
     preferences <- getPreferences(perfs, preferences.number, using.linear.func=TRUE)
