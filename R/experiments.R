@@ -15,9 +15,7 @@ launchAllExperiments <- function(results.base.dir,
         
         crits.nr <- matrix.sizes[m.size.idx,1]
         alts.nr <- matrix.sizes[m.size.idx,2]
-        if(is.null(perfs)) {
-          perfs <- generatePerformances(crits.nr, alts.nr, distribution)
-        }
+        perfs <- generatePerformances(crits.nr, alts.nr, distribution)
         matrix.size.dir.name <- paste(crits.nr, alts.nr, sep='x')
         
         print(paste(matrix.size.dir.name, distribution))
@@ -140,7 +138,7 @@ launchRobustnessExperiment <- function(perfs,
     pref.ind.relations.numbers <- matrix(ncol=pref.repetitions.number.rbst, nrow=1)
   }
   
-  for (pref.repetition.idx in 1:(pref.repetitions.number.expr)) {
+  for (pref.repetition.idx in 1:(pref.repetitions.number.expr*10)) {
     examine.robustness <- (found.solutions.number < pref.repetitions.number.rbst) && !is.null(preferences.number)
     
     preferences <- getPreferences(perfs, preferences.number, using.linear.func=TRUE)
