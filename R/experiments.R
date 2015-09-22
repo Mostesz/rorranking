@@ -24,7 +24,7 @@ launchAllExperiments <- function(results.base.dir,
         
         res <- launchAllExperimentsForPerfs(perfs,
                                             preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
-                                            examined.chact.points.numbers)
+                                            examined.chact.points.numbers, matrix.size.dir.name)
         matrix.sizes.results[[matrix.size.dir.name]] <- res
         
         print('Matrix size execution time:')
@@ -72,7 +72,7 @@ saveResultsForPerfs <- function(results.base.dir, results) {
 
 launchAllExperimentsForPerfs <- function(perfs,
                                          preferences.numbers.list, pref.repetitions.number.expr, pref.repetitions.number.rbst,
-                                         examined.chact.points.numbers) {
+                                         examined.chact.points.numbers, matrix.size.dir.name) {
   preferences.types.results <- list()
   for (preferences.number in preferences.numbers.list) {
     if (!is.null(preferences.number) && nrow(perfs)*(nrow(perfs)-1)/2 < preferences.number) {
@@ -88,7 +88,7 @@ launchAllExperimentsForPerfs <- function(perfs,
       if (pref.model$func.type == 'SEGMENTED') {
         pref.model.dir.name <- paste(pref.model$func.type, pref.model$charact.points.number, pref.model$discretization.method, sep='-')
       }
-      print(paste('>>', paste(pref.model.dir.name, preferences.type.dir.name, sep=', ')))
+      print(paste('>>', matrix.size.dir.name, paste(pref.model.dir.name, preferences.type.dir.name, sep=', ')))
       
       exp.res <- launchExpressivenessExperiment(perfs,
                                                 preferences.number, pref.repetitions.number.expr,
