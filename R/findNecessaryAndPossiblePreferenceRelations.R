@@ -33,7 +33,7 @@ findPreferenceRelations <- function(perf,
     }
     
     result$nec.relations <- findNecessaryOrPossibleRelations(perf, base.model=base.model, number.of.real.variables = number.of.real.variables, necessary=TRUE, filter=filter)
-    result$pos.relations <- findNecessaryOrPossibleRelations(perf, base.model=base.model, number.of.real.variables = number.of.real.variables, necessary=FALSE, filter=filter)
+    #result$pos.relations <- findNecessaryOrPossibleRelations(perf, base.model=base.model, number.of.real.variables = number.of.real.variables, necessary=FALSE, filter=filter)
   }
   
   return(result)
