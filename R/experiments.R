@@ -288,7 +288,7 @@ computeRelationsNumbers <- function(nec.relations, preferences, alts.nr) {
   pref.independent.relations.number <- 0
   for (i in 1:nrow(pref.adj.matrix)) {
     for (j in 1:ncol(pref.adj.matrix)) {
-      if (i != j && nec.relations[i,j] && !pref.adj.matrix[i,j]) {
+      if (i != j && nec.relations[i,j] == TRUE && pref.adj.matrix[i,j] == FALSE) {
         pref.independent.relations.number <- pref.independent.relations.number + 1
       }
     }
