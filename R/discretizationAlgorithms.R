@@ -13,7 +13,7 @@ getCharacteristicPoints <- function(perfs, nums.of.characteristic.points,
   
   switch(discretization.method,
          EQUAL_WIDTH_INTERVAL = {
-           getCharacteristicPointsEqualWidthInterval(perfs, nums.of.characteristic.points)
+           getCharacteristicPointsEqualWidthIntervalARules(perfs, nums.of.characteristic.points)
          },
          EQUAL_FREQ_INTERVAL = {
            getCharacteristicPointsEqualFreqInterval(perfs, nums.of.characteristic.points)
@@ -64,7 +64,7 @@ getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.charac
       
       for (cand.idx in 1:length(candidates)) {
         neighbors <- c(landmarks[sum(landmarks < candidates[[cand.idx]])],
-                     landmarks[length(landmarks) - sum(landmarks > candidates[[cand.idx]]) + 1])
+                       landmarks[length(landmarks) - sum(landmarks > candidates[[cand.idx]]) + 1])
         
         left.inst.idx <- NULL
         n.interval <- 0
@@ -84,7 +84,7 @@ getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.charac
             n.interval <- n.interval + 1
           }
         }
-
+        
         fleft <- sum(instances >= neighbors[1] & instances < candidates[[cand.idx]]) / ((candidates[[cand.idx]] - neighbors[1]) * n.interval)
         fright <- sum(instances >= candidates[[cand.idx]] & instances <= neighbors[2]) / ((neighbors[2] - candidates[[cand.idx]]) * n.interval)
         
@@ -242,6 +242,17 @@ getCharacteristicPointsEqualFreqInterval <- function(perfs, nums.of.characterist
     }
     
     list.of.characteristic.points[[i]] <- characteristic.points
+  }
+  return(list.of.characteristic.points)
+}
+
+getCharacteristicPointsEqualWidthIntervalARules <- function (perfs, nums.of.characteristic.points) {
+  crit.intervals.numbers = nums.of.characteristic.points - 1
+  list.of.characteristic.points = list()
+  nr.crit <- ncol(perfs)
+  for (i in 1:nr.crit){
+    intervals.no = crit.intervals.numbers[i]
+    list.of.characteristic.points[[i]] = discretize(perfs[,i], categories=intervals.no, onlycuts=TRUE)
   }
   return(list.of.characteristic.points)
 }
