@@ -3,6 +3,7 @@ from collections import defaultdict
 import numpy as np
 import os
 from enum import Enum
+import itertools
 import pandas as pd
 from utils import get_all_files_paths
 import matplotlib.pyplot as plt
@@ -67,6 +68,13 @@ class MethodType(Enum):
 class DistributionType(Enum):
     skew_normal = "skew normal"
     uniform = "uniform"
+
+    @staticmethod
+    def get_ordered():
+        return [
+            str(DistributionType.uniform),
+            str(DistributionType.skew_normal)
+        ]
 
 
 class DataUnit:
@@ -382,20 +390,42 @@ class WilcoxonForMethods(DataAggregation):
             self.dist_id_shortener = WilcoxonForMethods.IdShortener()
             self.pref_id_shortener = WilcoxonForMethods.IdShortener()
             self.ch_p_id_shortener = WilcoxonForMethods.IdShortener()
-            self._method_values_by_params = defaultdict(lambda: defaultdict(list))
+            self._general_method_values = defaultdict(lambda: defaultdict(list))
+            self.method_values_by_crits_no = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            self.method_values_by_alts_no = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            self.method_values_by_comps_no = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            self.method_values_by_distr = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+            self.method_values_by_ch_p = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
         def agg_data(self, data, values):
             if data.method_name:
                 params_code = self._get_params_code(data)
-                self._method_values_by_params[params_code][data.method_name].extend(values)
+                self._general_method_values[params_code][data.method_name].extend(values)
+                self.method_values_by_crits_no[data.crit_number][params_code][data.method_name].extend(values)
+                self.method_values_by_alts_no[data.alt_number][params_code][data.method_name].extend(values)
+                self.method_values_by_comps_no[data.pref_info][params_code][data.method_name].extend(values)
+                self.method_values_by_distr[data.distribution][params_code][data.method_name].extend(values)
+                self.method_values_by_ch_p[data.char_points][params_code][data.method_name].extend(values)
 
-        def get_p_value(self, method1, method2):
+        def get_general_p_value(self, method1, method2):
             method1_values = []
             method2_values = []
-            for values_by_method in self._method_values_by_params.itervalues():
+            for values_by_method in self._general_method_values.itervalues():
                 method1_values.extend(values_by_method[method1])
                 method2_values.extend(values_by_method[method2])
             return stats.wilcoxon(method1_values, method2_values)[1]
+
+        def get_p_value_for_param(self, method1, method2, values_for_param):
+            p_values_by_param = {}
+            for param, values_for_param in values_for_param.iteritems():
+                method1_values_for_param = []
+                method2_values_for_param = []
+                for values_by_method in values_for_param.itervalues():
+                    method1_values_for_param.extend(values_by_method[method1])
+                    method2_values_for_param.extend(values_by_method[method2])
+                p_value_for_param = stats.wilcoxon(method1_values_for_param, method2_values_for_param)[1]
+                p_values_by_param[param] = p_value_for_param
+            return p_values_by_param
 
         def _get_params_code(self, data):
             """
@@ -427,12 +457,38 @@ class WilcoxonForMethods(DataAggregation):
         aggregator.agg_data(data, agg_func(data.path))
 
     def generate_wilcoxon_comparisons(self):
-        self._save_wilcoxon_matrix('found_solution_number', self.aggregators[DataType.found_solution_number])
-        self._save_wilcoxon_matrix('eps', self.aggregators[DataType.eps])
-        self._save_wilcoxon_matrix('relations_number', self.aggregators[DataType.relations_number])
-        self._save_wilcoxon_matrix('new_relations_number', self.aggregators[DataType.new_relations_number])
+        self._save_wilcoxon_results('found_solution_number', self.aggregators[DataType.found_solution_number])
+        self._save_wilcoxon_results('eps', self.aggregators[DataType.eps])
+        self._save_wilcoxon_results('relations_number', self.aggregators[DataType.relations_number],
+                                    robustness_exp=True)
+        self._save_wilcoxon_results('new_relations_number', self.aggregators[DataType.new_relations_number],
+                                    robustness_exp=True)
 
-    def _save_wilcoxon_matrix(self, name, aggregator):
+    def _save_wilcoxon_results(self, name, aggregator, robustness_exp=False):
+        self._save_general_wilcoxon_matrix(name, aggregator)
+        self._save_wilcoxon_matrix_by_param(
+            '%s_criteria' % name,
+            lambda m1, m2: aggregator.get_p_value_for_param(m1, m2, aggregator.method_values_by_crits_no),
+            sorted(aggregator.method_values_by_crits_no))
+        self._save_wilcoxon_matrix_by_param(
+            '%s_alternatives' % name,
+            lambda m1, m2: aggregator.get_p_value_for_param(m1, m2, aggregator.method_values_by_alts_no),
+            sorted(aggregator.method_values_by_alts_no))
+        comp_values = [2, 4, 6, 8, 'ranking'] if not robustness_exp else [2, 4, 6, 8]
+        self._save_wilcoxon_matrix_by_param(
+            '%s_comparisons_no' % name,
+            lambda m1, m2: aggregator.get_p_value_for_param(m1, m2, aggregator.method_values_by_comps_no),
+            comp_values)
+        self._save_wilcoxon_matrix_by_param(
+            '%s_distribution' % name,
+            lambda m1, m2: aggregator.get_p_value_for_param(m1, m2, aggregator.method_values_by_distr),
+            DistributionType.get_ordered())
+        self._save_wilcoxon_matrix_by_param(
+            '%s_characteristic_points' % name,
+            lambda m1, m2: aggregator.get_p_value_for_param(m1, m2, aggregator.method_values_by_ch_p),
+            sorted(aggregator.method_values_by_ch_p))
+
+    def _save_general_wilcoxon_matrix(self, name, aggregator):
         with open(os.path.join(self.output_path, 'wilcoxon_%s.csv' % name), 'w') as output_file:
             methods = MethodType.get_ordered()
             output_file.write(',%s\n' % ','.join(methods))
@@ -440,9 +496,23 @@ class WilcoxonForMethods(DataAggregation):
                 output_file.write('%s' % method1)
                 for method2 in methods:
                     if method1 != method2:
-                        output_file.write(',%f' % aggregator.get_p_value(method1, method2))
+                        output_file.write(',%f' % aggregator.get_general_p_value(method1, method2))
                     else:
                         output_file.write(',')
+                output_file.write('\n')
+
+    def _save_wilcoxon_matrix_by_param(self, name, p_value_for_methods_pair, parameter_values):
+        with open(os.path.join(self.output_path, 'wilcoxon_%s.csv' % name), 'w') as output_file:
+            methods = MethodType.get_ordered()
+            header_fields = ['%s & %s' % (m1, m2) for m1, m2 in itertools.combinations(methods, 2)]
+            output_file.write(',%s\n' % ','.join(header_fields))
+            for param in parameter_values:
+                output_file.write('%s' % str(param))
+                for method1, method2 in itertools.combinations(methods, 2):
+                    p_values_for_params = p_value_for_methods_pair(method1, method2)
+                    if param not in p_values_for_params:
+                        raise Exception("Parameter \"%s\" not found in wilcoxon results" % param)
+                    output_file.write(',%f' % p_values_for_params[param])
                 output_file.write('\n')
 
 
