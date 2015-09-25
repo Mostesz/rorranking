@@ -528,33 +528,33 @@ def collect_data(aggregation_method, data_path):
 
 
 def aggregate_data(output_path, data_path):
-    # char_points_aggregation = AggregationByCharPoints(output_path)
-    # collect_data(char_points_aggregation, data_path)
-    # char_points_aggregation.generate_charts()
-    #
-    # method_aggregation = AggregationForMethod(output_path, MethodType.equal_width)
-    # collect_data(method_aggregation, data_path)
-    # method_aggregation.generate_charts()
-    #
-    # method_aggregation = AggregationForMethod(output_path, MethodType.equal_freq)
-    # collect_data(method_aggregation, data_path)
-    # method_aggregation.generate_charts()
-    #
-    # method_aggregation = AggregationForMethod(output_path, MethodType.ghaderi)
-    # collect_data(method_aggregation, data_path)
-    # method_aggregation.generate_charts()
-    #
-    # method_aggregation = AggregationForMethod(output_path, MethodType.kernel)
-    # collect_data(method_aggregation, data_path)
-    # method_aggregation.generate_charts()
-    #
-    # method_aggregation = AggregationForMethod(output_path, MethodType.kmeans)
-    # collect_data(method_aggregation, data_path)
-    # method_aggregation.generate_charts()
-    #
-    # summary_aggregation = SummaryAggregationByMethod(output_path)
-    # collect_data(summary_aggregation, data_path)
-    # summary_aggregation.generate_charts()
+    char_points_aggregation = AggregationByCharPoints(output_path)
+    collect_data(char_points_aggregation, data_path)
+    char_points_aggregation.generate_charts()
+
+    method_aggregation = AggregationForMethod(output_path, MethodType.equal_width)
+    collect_data(method_aggregation, data_path)
+    method_aggregation.generate_charts()
+
+    method_aggregation = AggregationForMethod(output_path, MethodType.equal_freq)
+    collect_data(method_aggregation, data_path)
+    method_aggregation.generate_charts()
+
+    method_aggregation = AggregationForMethod(output_path, MethodType.ghaderi)
+    collect_data(method_aggregation, data_path)
+    method_aggregation.generate_charts()
+
+    method_aggregation = AggregationForMethod(output_path, MethodType.kernel)
+    collect_data(method_aggregation, data_path)
+    method_aggregation.generate_charts()
+
+    method_aggregation = AggregationForMethod(output_path, MethodType.kmeans)
+    collect_data(method_aggregation, data_path)
+    method_aggregation.generate_charts()
+
+    summary_aggregation = SummaryAggregationByMethod(output_path)
+    collect_data(summary_aggregation, data_path)
+    summary_aggregation.generate_charts()
 
     wilcoxon_for_methods = WilcoxonForMethods(output_path)
     collect_data(wilcoxon_for_methods, data_path)
