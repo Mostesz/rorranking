@@ -342,9 +342,9 @@ findTransitiveClosure <- function(matrix) {
 getAllPreferencesModels <- function(examined.charact.points.numbers, crits.nr) {
   result <- list()
   pref.idx = 1
-  for (func.type in c('LINEAR', 'GENERAL', 'SEGMENTED')) {
+  for (func.type in c('SEGMENTED')) {#c('LINEAR', 'GENERAL', 'SEGMENTED')) {
     if (func.type == 'SEGMENTED') {
-      for (discretization.method in getDiscretizationAlgorithmsTypes()) {
+      for (discretization.method in c('KERNEL_DENSITY_ESTIMATION', 'GHADERI_DISCRETIZATION')) {#getDiscretizationAlgorithmsTypes()) {
         for (charact.points in examined.charact.points.numbers) {
           result[[pref.idx]] <- list(func.type=func.type,
                                      charact.points.number=charact.points,
