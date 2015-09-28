@@ -46,20 +46,18 @@ getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.charac
   list.of.characteristic.points <- list()
   
   nr.crit <- ncol(perfs)
-  for (i in 1:nr.crit) {
-    instances <- sort(perfs[,i])
+  for (crit.idx in 1:nr.crit) {
+    instances <- sort(perfs[,crit.idx])
     unique.instances <- unique(instances)
     
     candidates <- list()
-    for (j in 1:(length(unique.instances)-1)) {
-      candidates[[j]] <- (unique.instances[j] + unique.instances[j+1])/2
+    for (cand.idx in 1:(length(unique.instances)-1)) {
+      candidates[[cand.idx]] <- (unique.instances[cand.idx] + unique.instances[cand.idx + 1]) / 2
     }
     landmarks <- c(unique.instances[1], tail(unique.instances, n=1))
     cut.point.idx <- 0
     
-    while (cut.point.idx < intervals.numbers[i] - 1) {
-      pl <- matrix(0, nrow=length(instances), ncol=length(instances))
-      pr <- matrix(0, nrow=length(instances), ncol=length(instances))
+    while (cut.point.idx < intervals.numbers[crit.idx] - 1) {
       Score <- c()
       
       for (cand.idx in 1:length(candidates)) {
@@ -68,6 +66,7 @@ getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.charac
         
         left.inst.idx <- NULL
         n.interval <- 0
+        cut.inst.idx <- NULL
         for (inst.idx in 1:length(instances)) {
           if (instances[inst.idx] > neighbors[2]) {
             break
@@ -76,7 +75,7 @@ getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.charac
             if (is.null(left.inst.idx)) {
               left.inst.idx <- inst.idx
             }
-            if (instances[inst.idx] < candidates[cand.idx]) {
+            if (instances[inst.idx] < candidates[[cand.idx]]) {
               cut.inst.idx <- inst.idx
             }
             right.inst.idx <- inst.idx
@@ -85,44 +84,45 @@ getCharacteristicPointsKernelDensityEstimation <- function(perfs, nums.of.charac
           }
         }
         
-        fleft <- sum(instances >= neighbors[1] & instances < candidates[[cand.idx]]) / ((candidates[[cand.idx]] - neighbors[1]) * n.interval)
-        fright <- sum(instances >= candidates[[cand.idx]] & instances <= neighbors[2]) / ((neighbors[2] - candidates[[cand.idx]]) * n.interval)
-        
-        for (m in 1:length(instances)) {
-          if (instances[m] >= neighbors[1] && instances[m] < candidates[[cand.idx]]) {
-            for (n in 1:length(instances)) {
-              pl[n,m] <- kernelFunction(instances[m], instances[n], candidates[[cand.idx]] - neighbors[1])
-              pr[n,m] <- 0
-            }
-          } else if (instances[m] >= candidates[[cand.idx]] && instances[m] <= neighbors[2]) {
-            for (n in 1:length(instances)) {
-              pr[n,m] <- kernelFunction(instances[m], instances[n], neighbors[2] - candidates[[cand.idx]])
-              pl[n,m] <- 0
-            }
+        f.value.left <- sum(instances >= neighbors[1] && instances < candidates[[cand.idx]]) / ((candidates[[cand.idx]] - neighbors[1]) * n.interval)
+        f.value.right <- sum(instances >= candidates[[cand.idx]] && instances <= neighbors[2]) / ((neighbors[2] - candidates[[cand.idx]]) * n.interval)
+        left.score <- 0
+        for (i in left.inst.idx:cut.inst.idx) {
+          kernel.values.sum <- 0
+          for (j in left.inst.idx:right.inst.idx) {
+            k = kernelFunction(instances[i], instances[j], candidates[[cand.idx]] - neighbors[1])
+            kernel.values.sum <- kernel.values.sum + k
           }
+          p.value = kernel.values.sum / ((candidates[[cand.idx]] - neighbors[1]) * n.interval)
+          left.score <- left.score + (p.value - f.value.left)
         }
-        
-        PLeft <- colSums(pl) / ((candidates[[cand.idx]] - neighbors[1]) * n.interval)
-        PLeft <- PLeft[left.inst.idx:cut.inst.idx]
-        PRight <- colSums(pr) / ((neighbors[2] - candidates[[cand.idx]]) * n.interval)
-        PRight <- PRight[(cut.inst.idx+1):right.inst.idx]
-        Score[cand.idx] <- abs(sum(PLeft - fleft) + sum(PRight - fright))
+        right.score <- 0
+        for (i in (cut.inst.idx+1):right.inst.idx) {
+          kernel.values.sum <- 0
+          for (j in left.inst.idx:right.inst.idx) {
+            k = kernelFunction(instances[i], instances[j], neighbors[2] - candidates[[cand.idx]])
+            kernel.values.sum <- kernel.values.sum + k
+          }
+          p.value = kernel.values.sum / ((neighbors[2] - candidates[[cand.idx]]) * n.interval)
+          right.score <- right.score + (p.value - f.value.right)
+        }
+        Score[cand.idx] <- left.score + right.score
       }
-      
       BestCandidate <- candidates[[which.max(Score)]]
       landmarks <- c(landmarks, BestCandidate)
       landmarks <- sort(landmarks)
-      candidates[which.max(Score)] <- NULL
+      candidates[[which.max(Score)]] <- NULL
       
       cut.point.idx <- cut.point.idx + 1
     }
-    list.of.characteristic.points[[i]] <- landmarks
+    list.of.characteristic.points[[crit.idx]] <- landmarks
   }
   return(list.of.characteristic.points)
 }
 
 kernelFunction <- function(x1,x2,h) {
-  return(( 1 / ( (sqrt(2*pi)) * (h/6)) ) * exp( (-(x1-x2)^2) / (2*(h/6)^2) ))
+  u = (x1-x2)/h
+  return(kernel.function(u, kernel="gaussian"))
 }
 
 getCharacteristicPointsKMeans <- function(perfs, nums.of.characteristic.points) {
@@ -172,8 +172,10 @@ getCharacteristicPointsGhaderi <- function(perfs, nums.of.characteristic.points,
       for (preference.idx in 1:nrow(preferences)) {
         left.perfs <- perfs[preferences[preference.idx, 1], i]
         right.perfs <- perfs[preferences[preference.idx, 2], i]
+        lower.bound <- min(left.perfs, right.perfs)
+        upper.bound <- max(left.perfs, right.perfs)
         for (cand.idx in 1:length(candidates)) {
-          if (candidates[cand.idx] >= left.perfs && candidates[cand.idx] <= right.perfs) {
+          if (candidates[cand.idx] >= lower.bound && candidates[cand.idx] <= upper.bound) {
             candidates.obj[cand.idx] <- candidates.obj[cand.idx] + 1
           }
         }
