@@ -7,7 +7,7 @@ generatePerformances <- function(crits.nr, alts.nr, distribution) {
   }
   
   if (distribution == 'UNIFORM') {
-    genVector <- genRandomVectorNormalDistribution
+    genVector <- genRandomVectorUniformDistribution
   } else if (distribution == 'SKEW_NORMAL') {
     genVector <- genRandomVectorSkewNormalDistribution
   }
@@ -38,7 +38,7 @@ generatePerformances <- function(crits.nr, alts.nr, distribution) {
   return(perfs)
 }
 
-genRandomVectorNormalDistribution <- function(n) {
+genRandomVectorUniformDistribution <- function(n) {
   return(runif(n, 0, 1))
 }
 
