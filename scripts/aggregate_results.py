@@ -6,9 +6,15 @@ from enum import Enum
 import itertools
 import pandas as pd
 from utils import get_all_files_paths
+import matplotlib
 import matplotlib.pyplot as plt
-import brewer2mpl
 from scipy import stats
+
+
+LEGEND = False
+FONT_SIZE = 22
+
+matplotlib.rcParams.update({'font.size': FONT_SIZE})
 
 
 def agg_row(data_file_path):
@@ -20,6 +26,8 @@ def agg_row(data_file_path):
             line_no += 1
             if line_no >= 100:
                 break
+    if line_no < 100:
+        raise Exception('Found only %d proper values of 100' % line_no)
     return values
 
 
@@ -35,16 +43,27 @@ def agg_rowcol(data_file_path):
             line_no += 1
             if line_no >= 100:
                 break
-    #if line_no < 100:
-    #    raise Exception('Found only %d proper values of 100' % line_no)
+    if line_no < 100:
+        raise Exception('Found only %d proper values of 100' % line_no)
     return values
 
 
 class DataType(Enum):
-    found_solution_number = 'Average number of found solutions'
-    eps = 'Average epsilon value'
-    relations_number = 'Average number of necessary relations'
-    new_relations_number = 'Average number of new necessary relations'
+    found_solution_number = "AVG no. of found solutions"
+    eps = "AVG epsilon"
+    relations_number = "AVG no. of necessary relations"
+    new_relations_number = "AVG no. of new necessary relations"
+
+    @staticmethod
+    def get_code(data_type):
+        if data_type is DataType.found_solution_number:
+            return "found-sol"
+        if data_type is DataType.eps:
+            return "epsilon"
+        if data_type is DataType.relations_number:
+            return "necessary"
+        if data_type is DataType.new_relations_number:
+            return "new-necessary"
 
 
 class MethodType(Enum):
@@ -149,16 +168,65 @@ class Aggregator:
         self.by_distribution = defaultdict(lambda: defaultdict(list))
 
     def flat_data(self):
-        data_list = [
+        self._flat([
             self.by_crit_number,
             self.by_alt_number,
             self.by_comparison_number,
             self.by_distribution
-        ]
+        ])
+
+    def _flat(self, data_list):
         for data in data_list:
             for x, x_dict in data.iteritems():
                 for y, y_list in x_dict.iteritems():
                     data[x][y] = np.mean(y_list)
+
+
+class AggregatorSumAndCount:
+    def __init__(self):
+        self.by_crit_number = defaultdict(dict)
+        self.by_alt_number = defaultdict(dict)
+        self.by_comparison_number = defaultdict(dict)
+        self.by_distribution = defaultdict(dict)
+        self.by_charact_point = defaultdict(dict)
+
+    def add_by_crit(self, key1, key2, values):
+        self._add(self.by_crit_number, key1, key2, values)
+
+    def add_by_alts(self, key1, key2, values):
+        self._add(self.by_alt_number, key1, key2, values)
+
+    def add_by_comps(self, key1, key2, values):
+        self._add(self.by_comparison_number, key1, key2, values)
+
+    def add_by_distr(self, key1, key2, values):
+        self._add(self.by_distribution, key1, key2, values)
+
+    def add_by_ch_p(self, key1, key2, values):
+        self._add(self.by_charact_point, key1, key2, values)
+
+    def flat_data(self):
+        data_list = [
+            self.by_crit_number,
+            self.by_alt_number,
+            self.by_comparison_number,
+            self.by_distribution,
+            self.by_charact_point
+        ]
+
+        for data in data_list:
+            for x, x_dict in data.iteritems():
+                for y, value_tuple in x_dict.iteritems():
+                    values_sum, count = value_tuple
+                    data[x][y] = float(values_sum) / count
+
+    def _add(self, values_dict, key1, key2, values):
+        sum_to_add = sum(values)
+        if key2 not in values_dict[key1]:
+            values_dict[key1][key2] = (sum_to_add, len(values))
+        else:
+            values_sum, count = values_dict[key1][key2]
+            values_dict[key1][key2] = (values_sum + sum_to_add, count + len(values))
 
 
 class DataAggregation:
@@ -171,7 +239,10 @@ class DataAggregation:
 
 class AggregationByCharPoints(DataAggregation):
     def __init__(self, output_path):
-        DataAggregation.__init__(self, output_path)
+        output_dir = os.path.join(output_path, 'charac-points')
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        DataAggregation.__init__(self, output_dir)
         self.aggregators = {
             DataType.found_solution_number: Aggregator(),
             DataType.eps: Aggregator(),
@@ -194,78 +265,98 @@ class AggregationByCharPoints(DataAggregation):
 
     def generate_charts(self):
         for data_type, aggregator in self.aggregators.iteritems():
+            ylim = None
+            if data_type is DataType.found_solution_number:
+                ylim = (0, 100)
+            if data_type is DataType.eps:
+                ylim = (0, 0.9)
+            if data_type is DataType.relations_number:
+                ylim = (0, 50)
+            if data_type is DataType.new_relations_number:
+                ylim = (0, 35)
             aggregator.flat_data()
+            data_type_code = DataType.get_code(data_type)
             series_order = ['linear', '3 char. p.', '4 char. p.', '5 char. p.', '6 char. p.', 'general']
-            self._plot_chart(aggregator.by_crit_number, x_label='Criteria number', y_label=data_type,
-                             series_order=series_order)
-            self._plot_chart(aggregator.by_alt_number, x_label='Alternatives number', y_label=data_type,
-                             series_order=series_order)
-            self._plot_chart(aggregator.by_comparison_number, x_label='Number of pairwise alternatives comparisons',
-                             y_label=data_type, series_order=series_order)
-            self._plot_bar_chart(aggregator.by_distribution, x_label='Distribution', y_label=data_type,
-                                 series_order=series_order)
+            self._plot_chart('crits-%s' % data_type_code, aggregator.by_crit_number,
+                             x_label='Criteria number', y_label=data_type, series_order=series_order, ylim=ylim)
+            self._plot_chart('alts-%s' % data_type_code, aggregator.by_alt_number,
+                             x_label='Alternatives number', y_label=data_type, series_order=series_order, ylim=ylim)
+            self._plot_chart('comps-%s' % data_type_code, aggregator.by_comparison_number,
+                             x_label='Pairwise comparisons number', y_label=data_type,
+                             series_order=series_order, ylim=ylim)
+            self._plot_bar_chart('distr-%s' % data_type_code, aggregator.by_distribution,
+                                 x_label='Distribution type', y_label=data_type, series_order=series_order, ylim=ylim)
 
-    def _plot_bar_chart(self, data, x_label, y_label, series_order=None):
+    def _plot_bar_chart(self, output_name, data, x_label, y_label, series_order=None, ylim=None):
         df = pd.DataFrame(data)
         if series_order:
             df = df[series_order]
-        bmap = brewer2mpl.get_map('Set2', 'qualitative', len(data), reverse=True)
-        colors = bmap.mpl_colors
-        ax = df.plot(kind='bar', color=colors)
+        ax = df.plot(kind='bar')
+        ax.yaxis.grid()
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if ylim:
+            ax.set_ylim(ylim)
+        if LEGEND:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        else:
+            ax.legend().set_visible(False)
         locs, labels = plt.xticks()
         plt.setp(labels, rotation=0)
-        plt.savefig(os.path.join(self.output_path, 'charac_point_%s_%s.pdf' % (x_label, y_label)))
+        plt.savefig(os.path.join(self.output_path, '%s.pdf' % output_name), bbox_inches='tight')
         plt.close()
 
-    def _plot_chart(self, data, x_label, y_label, set_xticks=True, series_order=None):
+    def _plot_chart(self, output_name, data, x_label, y_label, set_xticks=True, series_order=None, ylim=None):
         df = pd.DataFrame(data)
         if series_order:
             df = df[series_order]
-        bmap = brewer2mpl.get_map('Set2', 'qualitative', len(data), reverse=True)
-        colors = bmap.mpl_colors
-        ax = df.plot(marker='o', color=colors)
+        ax = df.plot(style=['x-', '^-', 's-', 'p-', 'h-', 'o-'], clip_on=False, markersize=15, linewidth=3)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
+        if ylim:
+            ax.set_ylim(ylim)
         if set_xticks:
             x_values = set()
             for series_name, series_data in data.iteritems():
                 x_values.update(series_data.keys())
             ax.set_xticks(list(x_values))
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(os.path.join(self.output_path, 'charac_point_%s_%s.pdf' % (x_label, y_label)))
+        if LEGEND:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        else:
+            ax.legend().set_visible(False)
+        plt.savefig(os.path.join(self.output_path, '%s.pdf' % output_name), bbox_inches='tight')
         plt.close()
 
 
-class AggregationForMethod(DataAggregation):
-    def __init__(self, output_path, method_name):
-        DataAggregation.__init__(self, output_path)
-        self.method_name = method_name
+class AggregationByMethods(DataAggregation):
+    def __init__(self, output_path):
+        output_dir = os.path.join(output_path, 'methods-comp')
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        DataAggregation.__init__(self, output_dir)
         self.aggregators = {
-            DataType.found_solution_number: Aggregator(),
-            DataType.eps: Aggregator(),
-            DataType.relations_number: Aggregator(),
-            DataType.new_relations_number: Aggregator()
+            DataType.found_solution_number: AggregatorSumAndCount(),
+            DataType.eps: AggregatorSumAndCount(),
+            DataType.relations_number: AggregatorSumAndCount(),
+            DataType.new_relations_number: AggregatorSumAndCount(),
         }
 
     def add_data(self, data):
-        if not isinstance(data.char_points, str) and data.method_name == self.method_name:
+        if not isinstance(data.char_points, str):
             aggregator = self.aggregators[data.data_type]
 
-            ch_point_str = '%d char. p.' % data.char_points
             agg_func = agg_row if data.data_type == DataType.found_solution_number else agg_rowcol
 
-            aggregator.by_crit_number[ch_point_str][data.crit_number].extend(agg_func(data.path))
-            aggregator.by_alt_number[ch_point_str][data.alt_number].extend(agg_func(data.path))
+            aggregator.add_by_crit(data.method_name, data.crit_number, agg_func(data.path))
+            aggregator.add_by_alts(data.method_name, data.alt_number, agg_func(data.path))
             data.pref_info = data.pref_info if data.pref_info != 'ranking' else 10
-            aggregator.by_comparison_number[ch_point_str][data.pref_info].extend(agg_func(data.path))
-            aggregator.by_distribution[ch_point_str][data.distribution].extend(agg_func(data.path))
+            aggregator.add_by_comps(data.method_name, data.pref_info, agg_func(data.path))
+            aggregator.add_by_distr(data.method_name, data.distribution, agg_func(data.path))
+            aggregator.add_by_ch_p(data.method_name, data.char_points, agg_func(data.path))
 
     def generate_charts(self):
         for data_type, aggregator in self.aggregators.iteritems():
@@ -275,35 +366,55 @@ class AggregationForMethod(DataAggregation):
             if data_type == DataType.new_relations_number or data_type == DataType.relations_number:
                 xticks = [2, 4, 6, 8]
                 xtickslabels = ['2', '4', '6', '8']
+            ylim = None
+            if data_type is DataType.found_solution_number:
+                ylim = (25, 100)
+            if data_type is DataType.eps:
+                ylim = (0, 0.75)
+            if data_type is DataType.relations_number:
+                ylim = (10, 25)
+            if data_type is DataType.new_relations_number:
+                ylim = (0, 8)
+            data_type_code = DataType.get_code(data_type)
+            self._plot_chart("crits-%s" % data_type_code, aggregator.by_crit_number,
+                             x_label='Criteria number', y_label=data_type, ylim=ylim)
+            self._plot_chart("alts-%s" % data_type_code, aggregator.by_alt_number,
+                             x_label='Alternatives number', y_label=data_type, ylim=ylim)
+            self._plot_chart("comps-%s" % data_type_code, aggregator.by_comparison_number,
+                             x_label='Pairwise comparisons number',
+                             y_label=data_type, set_xticks=False, xticks=xticks, xtickslabels=xtickslabels, ylim=ylim)
+            self._plot_bar_chart("distr-%s" % data_type_code, aggregator.by_distribution,
+                                 x_label='Distribution type', y_label=data_type, ylim=ylim)
+            self._plot_chart("characp-%s" % data_type_code, aggregator.by_charact_point,
+                             x_label='Characteristic points number', y_label=data_type, ylim=ylim)
 
-            self._plot_chart(aggregator.by_crit_number, x_label='Criteria number', y_label=data_type)
-            self._plot_chart(aggregator.by_alt_number, x_label='Alternatives number', y_label=data_type)
-            self._plot_chart(aggregator.by_comparison_number, x_label='Number of pairwise alternatives comparisons',
-                             y_label=data_type, set_xticks=False, xticks=xticks, xtickslabels=xtickslabels)
-            self._plot_bar_chart(aggregator.by_distribution, x_label='Distribution', y_label=data_type)
-
-    def _plot_bar_chart(self, data, x_label, y_label):
+    def _plot_bar_chart(self, output_name, data, x_label, y_label, ylim=None):
         df = pd.DataFrame(data)
-        bmap = brewer2mpl.get_map('Set2', 'qualitative', len(data), reverse=True)
-        colors = bmap.mpl_colors
-        ax = df.plot(kind='bar', color=colors)
+        ax = df.plot(kind='bar')
+        ax.yaxis.grid()
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if ylim:
+            ax.set_ylim(ylim)
+        if LEGEND:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        else:
+            ax.legend().set_visible(False)
         locs, labels = plt.xticks()
         plt.setp(labels, rotation=0)
-        plt.savefig(os.path.join(self.output_path, '%s_%s_%s.pdf' % (self.method_name, x_label, y_label)))
+        plt.savefig(os.path.join(self.output_path, '%s.pdf' % output_name), bbox_inches='tight')
         plt.close()
 
-    def _plot_chart(self, data, x_label, y_label, set_xticks=True, xticks=None, xtickslabels=None):
+    def _plot_chart(self, output_name, data, x_label, y_label, set_xticks=True, xticks=None, xtickslabels=None,
+                    ylim=None):
         df = pd.DataFrame(data)
-        bmap = brewer2mpl.get_map('Set2', 'qualitative', len(data), reverse=True)
-        colors = bmap.mpl_colors
-        ax = df.plot(marker='o', color=colors)
+        ax = df.plot(style='.-', clip_on=False, markersize=15, linewidth=2)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
+        if ylim:
+            ax.set_ylim(ylim)
         if set_xticks:
             x_values = set()
             for series_name, series_data in data.iteritems():
@@ -312,16 +423,22 @@ class AggregationForMethod(DataAggregation):
         if xticks and xtickslabels:
             ax.set_xticks(xticks)
             ax.set_xticklabels(xtickslabels)
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(os.path.join(self.output_path, '%s_%s_%s.pdf' % (self.method_name, x_label, y_label)))
+        if LEGEND:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        else:
+            ax.legend().set_visible(False)
+        plt.savefig(os.path.join(self.output_path, '%s.pdf' % output_name), bbox_inches='tight')
         plt.close()
 
 
 class SummaryAggregationByMethod(DataAggregation):
     def __init__(self, output_path):
-        DataAggregation.__init__(self, output_path)
+        output_dir = os.path.join(output_path, 'general')
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        DataAggregation.__init__(self, output_dir)
         self.aggregators = {
             DataType.found_solution_number: defaultdict(lambda: defaultdict(list)),
             DataType.eps: defaultdict(lambda: defaultdict(list)),
@@ -343,17 +460,12 @@ class SummaryAggregationByMethod(DataAggregation):
             for x, x_dict in aggregator.iteritems():
                 for y, y_list in x_dict.iteritems():
                     aggregator[x][y] = np.mean(y_list)
-            ylim = None
-            if data_type == DataType.relations_number:
-                ylim = (0, 19)
-            self._plot_chart(aggregator, x_label='Dicretization method code', y_label=data_type,  set_xticks=False,
-                             ylim=ylim)
+            self._plot_chart(aggregator, x_label='Discretization method', y_label=data_type,  set_xticks=False)
 
     def _plot_chart(self, data, x_label, y_label, set_xticks=True, xticks=None, xtickslabels=None, ylim=None):
         df = pd.DataFrame(data)
-        bmap = brewer2mpl.get_map('Set2', 'qualitative', len(data), reverse=True)
-        colors = bmap.mpl_colors
-        ax = df.plot(kind='bar', color=colors)
+        ax = df.plot(kind='bar')
+        ax.yaxis.grid()
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
         if set_xticks:
@@ -366,12 +478,15 @@ class SummaryAggregationByMethod(DataAggregation):
             ax.set_xticklabels(xtickslabels)
         if ylim is not None:
             ax.set_ylim(ylim)
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        if LEGEND:
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        else:
+            ax.legend().set_visible(False)
         locs, labels = plt.xticks()
         plt.setp(labels, rotation=0)
-        plt.savefig(os.path.join(self.output_path, 'summary_methods_%s_%s.pdf' % (x_label, y_label)))
+        plt.savefig(os.path.join(self.output_path, '%s.pdf' % (DataType.get_code(y_label))), bbox_inches='tight')
         plt.close()
 
 
@@ -532,30 +647,14 @@ def aggregate_data(output_path, data_path):
     collect_data(char_points_aggregation, data_path)
     char_points_aggregation.generate_charts()
 
-    method_aggregation = AggregationForMethod(output_path, MethodType.equal_width)
-    collect_data(method_aggregation, data_path)
-    method_aggregation.generate_charts()
-
-    method_aggregation = AggregationForMethod(output_path, MethodType.equal_freq)
-    collect_data(method_aggregation, data_path)
-    method_aggregation.generate_charts()
-
-    method_aggregation = AggregationForMethod(output_path, MethodType.ghaderi)
-    collect_data(method_aggregation, data_path)
-    method_aggregation.generate_charts()
-
-    method_aggregation = AggregationForMethod(output_path, MethodType.kernel)
-    collect_data(method_aggregation, data_path)
-    method_aggregation.generate_charts()
-
-    method_aggregation = AggregationForMethod(output_path, MethodType.kmeans)
+    method_aggregation = AggregationByMethods(output_path)
     collect_data(method_aggregation, data_path)
     method_aggregation.generate_charts()
 
     summary_aggregation = SummaryAggregationByMethod(output_path)
     collect_data(summary_aggregation, data_path)
     summary_aggregation.generate_charts()
-
+    
     wilcoxon_for_methods = WilcoxonForMethods(output_path)
     collect_data(wilcoxon_for_methods, data_path)
     wilcoxon_for_methods.generate_wilcoxon_comparisons()
