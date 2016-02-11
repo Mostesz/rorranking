@@ -49,10 +49,10 @@ def agg_rowcol(data_file_path):
 
 
 class DataType(Enum):
-    found_solution_number = "AVG no. of found solutions"
-    eps = "AVG epsilon"
-    relations_number = "AVG no. of necessary relations"
-    new_relations_number = "AVG no. of new necessary relations"
+    found_solution_number = "percentage of consistent decision scenarios"
+    eps = "difference in values of reference alternatives"
+    relations_number = "number of necessary relations"
+    new_relations_number = "number of non-trivial necessary inferences"
 
     @staticmethod
     def get_code(data_type):
@@ -67,11 +67,11 @@ class DataType(Enum):
 
 
 class MethodType(Enum):
-    equal_freq = 'EF'
-    equal_width = 'EW'
-    ghaderi = 'GH'
-    kernel = 'KDE'
-    kmeans = 'KM'
+    equal_freq = 'EFB'   # 'EF'
+    equal_width = 'EWB'  # 'EW'
+    ghaderi = 'SSP'      # 'GH'
+    kernel = 'KDE'       # 'KDE'
+    kmeans = 'KMC'       # 'KM'
 
     @staticmethod
     def get_ordered():
@@ -278,14 +278,14 @@ class AggregationByCharPoints(DataAggregation):
             data_type_code = DataType.get_code(data_type)
             series_order = ['linear', '3 char. p.', '4 char. p.', '5 char. p.', '6 char. p.', 'general']
             self._plot_chart('crits-%s' % data_type_code, aggregator.by_crit_number,
-                             x_label='Criteria number', y_label=data_type, series_order=series_order, ylim=ylim)
+                             x_label='number of criteria', y_label=data_type, series_order=series_order, ylim=ylim)
             self._plot_chart('alts-%s' % data_type_code, aggregator.by_alt_number,
-                             x_label='Alternatives number', y_label=data_type, series_order=series_order, ylim=ylim)
+                             x_label='number of alternatives', y_label=data_type, series_order=series_order, ylim=ylim)
             self._plot_chart('comps-%s' % data_type_code, aggregator.by_comparison_number,
-                             x_label='Pairwise comparisons number', y_label=data_type,
+                             x_label='number of pairwise comparisons', y_label=data_type,
                              series_order=series_order, ylim=ylim)
             self._plot_bar_chart('distr-%s' % data_type_code, aggregator.by_distribution,
-                                 x_label='Distribution type', y_label=data_type, series_order=series_order, ylim=ylim)
+                                 x_label='performance distribution', y_label=data_type, series_order=series_order, ylim=ylim)
 
     def _plot_bar_chart(self, output_name, data, x_label, y_label, series_order=None, ylim=None):
         df = pd.DataFrame(data)
@@ -377,19 +377,19 @@ class AggregationByMethods(DataAggregation):
                 ylim = (0, 8)
             data_type_code = DataType.get_code(data_type)
             self._plot_chart("crits-%s" % data_type_code, aggregator.by_crit_number,
-                             x_label='Criteria number', y_label=data_type, ylim=ylim)
+                             x_label='number of criteria', y_label=data_type, ylim=ylim)
             self._plot_chart("alts-%s" % data_type_code, aggregator.by_alt_number,
-                             x_label='Alternatives number', y_label=data_type, ylim=ylim)
+                             x_label='number of alternatives', y_label=data_type, ylim=ylim)
             self._plot_chart("comps-%s" % data_type_code, aggregator.by_comparison_number,
-                             x_label='Pairwise comparisons number',
+                             x_label='number of pairwise comparisons',
                              y_label=data_type, set_xticks=False, xticks=xticks, xtickslabels=xtickslabels, ylim=ylim)
             self._plot_bar_chart("distr-%s" % data_type_code, aggregator.by_distribution,
-                                 x_label='Distribution type', y_label=data_type, ylim=ylim)
+                                 x_label='performance distribution', y_label=data_type, ylim=ylim)
             self._plot_chart("characp-%s" % data_type_code, aggregator.by_charact_point,
-                             x_label='Characteristic points number', y_label=data_type, ylim=ylim)
+                             x_label='number of characteristic points', y_label=data_type, ylim=ylim)
 
     def _plot_bar_chart(self, output_name, data, x_label, y_label, ylim=None):
-        df = pd.DataFrame(data)
+        df = pd.DataFrame(data, columns=MethodType.get_ordered())
         ax = df.plot(kind='bar')
         ax.yaxis.grid()
         ax.set_xlabel(x_label)
@@ -409,8 +409,8 @@ class AggregationByMethods(DataAggregation):
 
     def _plot_chart(self, output_name, data, x_label, y_label, set_xticks=True, xticks=None, xtickslabels=None,
                     ylim=None):
-        df = pd.DataFrame(data)
-        ax = df.plot(style='.-', clip_on=False, markersize=15, linewidth=2)
+        df = pd.DataFrame(data, columns=MethodType.get_ordered())
+        ax = df.plot(style=['x-', '^-', 's-', 'p-', 'h-', 'o-'], clip_on=False, markersize=15, linewidth=2)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
         if ylim:
@@ -456,14 +456,15 @@ class SummaryAggregationByMethod(DataAggregation):
             aggregator[ch_point_str][data.method_name].extend(agg_func(data.path))
 
     def generate_charts(self):
+        data = defaultdict(dict)
         for data_type, aggregator in self.aggregators.iteritems():
             for x, x_dict in aggregator.iteritems():
                 for y, y_list in x_dict.iteritems():
-                    aggregator[x][y] = np.mean(y_list)
-            self._plot_chart(aggregator, x_label='Discretization method', y_label=data_type,  set_xticks=False)
+                    data[x][y] = np.mean(y_list)
+            self._plot_chart(data, x_label='Discretization method', y_label=data_type,  set_xticks=False)
 
     def _plot_chart(self, data, x_label, y_label, set_xticks=True, xticks=None, xtickslabels=None, ylim=None):
-        df = pd.DataFrame(data)
+        df = pd.DataFrame(data, index=MethodType.get_ordered())
         ax = df.plot(kind='bar')
         ax.yaxis.grid()
         ax.set_xlabel(x_label)
@@ -654,7 +655,7 @@ def aggregate_data(output_path, data_path):
     summary_aggregation = SummaryAggregationByMethod(output_path)
     collect_data(summary_aggregation, data_path)
     summary_aggregation.generate_charts()
-    
+
     wilcoxon_for_methods = WilcoxonForMethods(output_path)
     collect_data(wilcoxon_for_methods, data_path)
     wilcoxon_for_methods.generate_wilcoxon_comparisons()
